@@ -34,7 +34,7 @@ export async function getScheduleRows() {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: GOOGLE_SHEET_RANGE,
+    range: getScheduleDataRange(),
   });
 
   return response.data.values ?? [];
@@ -365,7 +365,7 @@ export async function removeEmployeeByName({ actor, displayName }) {
 async function updateScheduleEmployeeName(sheets, currentName, nextName) {
   const rowsResponse = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: GOOGLE_SHEET_RANGE,
+    range: getScheduleDataRange(),
   });
   const rows = rowsResponse.data.values ?? [];
   const [header, ...dataRows] = rows;
@@ -717,7 +717,7 @@ async function sheetExists(sheets, sheetName) {
 async function seedEmployeeSheetFromSchedules(sheets) {
   const rowsResponse = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: GOOGLE_SHEET_RANGE,
+    range: getScheduleDataRange(),
   });
   const rows = rowsResponse.data.values ?? [];
   const [header, ...dataRows] = rows;
@@ -772,7 +772,7 @@ function getNextSortOrder(records) {
 async function getScheduleSheetContext(sheets) {
   const rowsResponse = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: GOOGLE_SHEET_RANGE,
+    range: getScheduleDataRange(),
   });
   const rows = rowsResponse.data.values ?? [];
   const header = rows[0] ?? [];
@@ -811,6 +811,10 @@ function getCell(row, columnMap, field) {
 function getSheetNameFromRange(range) {
   const [sheetName] = range.split('!');
   return sheetName.replace(/^'|'$/g, '');
+}
+
+function getScheduleDataRange() {
+  return `${quoteSheetName(getSheetNameFromRange(GOOGLE_SHEET_RANGE))}!A:Z`;
 }
 
 function quoteSheetName(sheetName) {

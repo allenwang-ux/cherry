@@ -891,7 +891,6 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       <div class="modal-actions">
         <button class="secondary" type="button" id="clearShift">移除班別</button>
         <button class="secondary" type="button" id="cancelShift">取消</button>
-        <button class="primary" type="button" id="saveShift">儲存</button>
       </div>
     </form>
   </dialog>
@@ -956,11 +955,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     document.querySelector('#prevMonth').addEventListener('click', () => changeMonth(-1));
     document.querySelector('#nextMonth').addEventListener('click', () => changeMonth(1));
     document.querySelector('#cancelShift').addEventListener('click', () => dialog.close());
-    document.querySelector('#clearShift').addEventListener('click', () => {
-      selectedShifts.clear();
-      renderShiftPicker();
-    });
-    document.querySelector('#saveShift').addEventListener('click', saveShift);
+    document.querySelector('#clearShift').addEventListener('click', () => saveShift(''));
     document.querySelector('#addEmployee').addEventListener('click', addEmployee);
     document.querySelector('#removeEmployee').addEventListener('click', removeEmployee);
     document.querySelector('#refreshHistory').addEventListener('click', loadHistory);
@@ -1299,25 +1294,22 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       }).join('');
 
       document.querySelectorAll('.shift-option').forEach((button) => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
           const shift = button.dataset.shift;
-          if (selectedShifts.has(shift)) {
-            selectedShifts.delete(shift);
-          } else {
-            selectedShifts.add(shift);
-          }
+          selectedShifts = new Set([shift]);
           renderShiftPicker();
+          await saveShift(shift);
         });
       });
     }
 
-    async function saveShift() {
+    async function saveShift(shiftOverride) {
       if (!profile) {
         showError('請先登入 LINE。');
         return;
       }
 
-      const shift = SHIFT_CODES.filter((code) => selectedShifts.has(code)).join('+');
+      const shift = shiftOverride === undefined ? SHIFT_CODES.filter((code) => selectedShifts.has(code)).join('+') : shiftOverride;
 
       const response = await fetch('/api/my-shifts', {
         method: 'POST',
