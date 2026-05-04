@@ -10,18 +10,20 @@ export function renderSchedulePage({ liffId = '' } = {}) {
   <style>
     :root {
       color-scheme: light;
-      --ink: #1f2933;
-      --muted: #667085;
-      --line: #cfd8d5;
-      --line-strong: #9eadaa;
-      --brand: #00b900;
-      --brand-dark: #078a18;
-      --bg: #f4f6f5;
+      --ink: #4a2430;
+      --muted: #8f6672;
+      --line: #f2bfcb;
+      --line-strong: #e78298;
+      --brand: #e83f67;
+      --brand-dark: #b91f47;
+      --bg: #fff6f8;
       --panel: #ffffff;
-      --today: #fff7df;
-      --mine: #eaf8ec;
-      --weekend: #b42318;
+      --cream: #fffaf0;
+      --today: #fff1cf;
+      --mine: #ffe5ed;
+      --weekend: #c9274b;
       --danger: #b42318;
+      --shadow: 0 18px 46px rgba(180, 63, 95, 0.13);
     }
     * {
       box-sizing: border-box;
@@ -29,25 +31,42 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at 18px 18px, rgba(232, 63, 103, 0.08) 0 2px, transparent 3px),
+        linear-gradient(135deg, #fff8fb 0%, #fff2f5 42%, #fffaf0 100%);
+      background-size: 42px 42px, auto;
       color: var(--ink);
+      min-height: 100vh;
     }
     header {
       align-items: center;
-      background: rgba(255, 255, 255, 0.97);
-      border-bottom: 1px solid var(--line);
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.98), rgba(255, 248, 250, 0.98)),
+        var(--panel);
+      border-bottom: 2px solid var(--line);
       display: flex;
       gap: 12px;
       justify-content: space-between;
-      padding: 12px 14px;
+      padding: 14px 18px;
       position: sticky;
       top: 0;
       z-index: 20;
+      box-shadow: 0 10px 28px rgba(180, 63, 95, 0.1);
+    }
+    .brand {
+      align-items: center;
+      display: flex;
+      gap: 12px;
+      min-width: 0;
+    }
+    .brand-copy {
+      min-width: 0;
     }
     h1 {
-      font-size: 18px;
+      font-size: 20px;
       line-height: 1.2;
       margin: 0;
+      letter-spacing: 0;
     }
     .user {
       color: var(--muted);
@@ -58,13 +77,18 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       align-items: center;
       display: flex;
       gap: 8px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      box-shadow: 0 8px 22px rgba(180, 63, 95, 0.1);
+      padding: 5px;
     }
     .icon-button {
       align-items: center;
-      background: var(--panel);
+      background: var(--cream);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      color: var(--ink);
+      border-radius: 999px;
+      color: var(--brand-dark);
       cursor: pointer;
       display: grid;
       font-size: 18px;
@@ -74,14 +98,59 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       place-items: center;
       width: 38px;
     }
+    .icon-button:hover {
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
+    }
     .month-title {
-      font-size: 16px;
+      color: var(--ink);
+      font-size: 17px;
       font-weight: 900;
       min-width: 86px;
       text-align: center;
     }
     main {
-      padding: 12px;
+      padding: 18px 12px 28px;
+    }
+    .bow-mark {
+      display: inline-grid;
+      flex: 0 0 auto;
+      height: 38px;
+      place-items: center;
+      position: relative;
+      width: 52px;
+    }
+    .bow-mark::before,
+    .bow-mark::after {
+      background: var(--brand);
+      border: 3px solid #fff;
+      box-shadow: 0 5px 12px rgba(180, 63, 95, 0.22);
+      content: "";
+      height: 26px;
+      position: absolute;
+      top: 5px;
+      width: 28px;
+    }
+    .bow-mark::before {
+      border-radius: 16px 12px 14px 12px;
+      left: 0;
+      transform: rotate(-16deg);
+    }
+    .bow-mark::after {
+      border-radius: 12px 16px 12px 14px;
+      right: 0;
+      transform: rotate(16deg);
+    }
+    .bow-knot {
+      background: #ffd3dc;
+      border: 3px solid #fff;
+      border-radius: 999px;
+      box-shadow: 0 5px 12px rgba(180, 63, 95, 0.18);
+      height: 22px;
+      position: relative;
+      width: 22px;
+      z-index: 1;
     }
     .dev-login {
       display: none;
@@ -91,16 +160,17 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     }
     .dev-login input {
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 14px;
       flex: 1;
       font-size: 15px;
       padding: 10px 12px;
     }
     .dev-login button,
     .primary {
-      background: var(--brand);
+      background: linear-gradient(180deg, #f05278, var(--brand));
       border: 0;
-      border-radius: 8px;
+      border-radius: 999px;
+      box-shadow: 0 8px 18px rgba(232, 63, 103, 0.22);
       color: #fff;
       cursor: pointer;
       font-size: 15px;
@@ -110,7 +180,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .notice {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
       color: var(--muted);
       margin: 0 auto 12px;
       max-width: 820px;
@@ -125,14 +196,15 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       flex-wrap: wrap;
       font-size: 13px;
       gap: 8px;
-      margin: 0 auto 10px;
+      margin: 0 auto 12px;
       max-width: 1180px;
     }
     .admin-panel {
       align-items: center;
-      background: var(--panel);
+      background: rgba(255, 255, 255, 0.88);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 18px;
+      box-shadow: var(--shadow);
       display: none;
       flex-wrap: wrap;
       gap: 8px;
@@ -148,7 +220,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .admin-panel select,
     .admin-panel input {
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 999px;
       font-size: 15px;
       min-height: 38px;
       padding: 8px 10px;
@@ -160,15 +232,17 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       min-width: 140px;
     }
     .legend span {
-      background: var(--panel);
+      background: rgba(255, 255, 255, 0.9);
       border: 1px solid var(--line);
       border-radius: 999px;
-      padding: 5px 9px;
+      box-shadow: 0 8px 18px rgba(180, 63, 95, 0.08);
+      padding: 7px 11px;
     }
     .table-wrap {
       background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
+      border: 2px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
       margin: 0 auto;
       max-width: 1180px;
       overflow: auto;
@@ -182,13 +256,13 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     th,
     td {
       border: 1px solid var(--line);
-      height: 42px;
+      height: 46px;
       padding: 0;
       text-align: center;
       vertical-align: middle;
     }
     th {
-      background: #eef3f1;
+      background: #ffe9ef;
       color: var(--ink);
       font-size: 14px;
       font-weight: 900;
@@ -200,14 +274,14 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .date-cell {
       left: 0;
       position: sticky;
-      width: 76px;
+      width: 82px;
       z-index: 4;
     }
     .date-head {
-      background: #e6eeeb;
+      background: #ffdbe5;
     }
     .date-cell {
-      background: #fbfcfc;
+      background: #fffafc;
       color: var(--ink);
       font-weight: 800;
     }
@@ -229,23 +303,31 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-weight: 900;
     }
     td.mine:hover {
-      outline: 2px solid var(--brand);
-      outline-offset: -2px;
+      background: #ffd3df;
+      outline: 3px solid var(--brand);
+      outline-offset: -3px;
     }
     .shift-code {
-      color: var(--ink);
-      font-size: 17px;
+      background: #fff;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      box-shadow: 0 4px 10px rgba(180, 63, 95, 0.1);
+      color: var(--brand-dark);
+      display: inline-block;
+      font-size: 16px;
       font-weight: 900;
       line-height: 1;
+      min-width: 36px;
+      padding: 6px 9px;
     }
     .empty-cell {
-      color: #a7b0ad;
+      color: #d4a3ae;
       font-size: 18px;
     }
     dialog {
       border: 0;
-      border-radius: 8px;
-      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.24);
+      border-radius: 22px;
+      box-shadow: 0 22px 70px rgba(74, 36, 48, 0.28);
       max-width: calc(100vw - 28px);
       padding: 0;
       width: 360px;
@@ -254,7 +336,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       background: rgba(15, 23, 42, 0.32);
     }
     .modal {
-      padding: 18px;
+      background: linear-gradient(180deg, #fff, #fff6f8);
+      padding: 20px;
     }
     .modal h2 {
       font-size: 18px;
@@ -273,15 +356,17 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .shift-option {
       background: var(--panel);
       border: 1px solid var(--line-strong);
-      border-radius: 8px;
+      border-radius: 16px;
+      color: var(--ink);
       cursor: pointer;
       font-size: 18px;
       font-weight: 900;
       height: 46px;
     }
     .shift-option.active {
-      background: var(--brand);
+      background: linear-gradient(180deg, #f05278, var(--brand));
       border-color: var(--brand);
+      box-shadow: 0 8px 18px rgba(232, 63, 103, 0.22);
       color: #fff;
     }
     .modal-actions {
@@ -293,7 +378,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .secondary {
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 999px;
       color: var(--ink);
       cursor: pointer;
       font-size: 15px;
@@ -304,6 +389,11 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       header {
         align-items: flex-start;
         flex-direction: column;
+        padding: 12px;
+      }
+      .month-nav {
+        width: 100%;
+        justify-content: space-between;
       }
       main {
         padding: 10px;
@@ -321,9 +411,12 @@ export function renderSchedulePage({ liffId = '' } = {}) {
 </head>
 <body>
   <header>
-    <div>
-      <h1>清心填班系統</h1>
-      <div class="user" id="user">登入中</div>
+    <div class="brand">
+      <span class="bow-mark" aria-hidden="true"><span class="bow-knot"></span></span>
+      <div class="brand-copy">
+        <h1>清心填班系統</h1>
+        <div class="user" id="user">登入中</div>
+      </div>
     </div>
     <div class="month-nav" aria-label="月份切換">
       <button class="icon-button" type="button" id="prevMonth" aria-label="上個月">‹</button>
