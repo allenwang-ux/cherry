@@ -1,0 +1,21 @@
+{
+  "name": "drink-shop-scheduler-line-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js",
+    "test": "node --test",
+    "read-sheet": "node read-sheet.js",
+    "schedules": "node list-schedules.js",
+    "simulate": "node simulate-reply.js"
+  },
+  "dependencies": {
+    "@line/bot-sdk": "^9.7.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^171.4.0"
+  },
+  "devDependencies": {}
+}
