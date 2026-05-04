@@ -47,6 +47,27 @@ test('replies with employee schedule', async () => {
   assert.match(reply, /2026-05-04 A 小明/);
 });
 
+test('uses request base url for schedule link when env is placeholder', async () => {
+  const originalPublicBaseUrl = process.env.PUBLIC_BASE_URL;
+  process.env.PUBLIC_BASE_URL = 'TO_BE_FILLED_AFTER_DEPLOY';
+
+  try {
+    const reply = await createReplyText('填班', {
+      ...options(),
+      publicBaseUrl: 'https://qingxin-scheduler.example.run.app',
+    });
+
+    assert.match(reply, /https:\/\/qingxin-scheduler\.example\.run\.app\/schedule/);
+    assert.doesNotMatch(reply, /TO_BE_FILLED/);
+  } finally {
+    if (originalPublicBaseUrl === undefined) {
+      delete process.env.PUBLIC_BASE_URL;
+    } else {
+      process.env.PUBLIC_BASE_URL = originalPublicBaseUrl;
+    }
+  }
+});
+
 test('replies with help text for unknown message', async () => {
   const reply = await createReplyText('你好', options());
   assert.match(reply, /可用指令/);

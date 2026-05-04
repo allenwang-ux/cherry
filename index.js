@@ -176,13 +176,14 @@ app.post('/debug/reply', express.json(), async (req, res) => {
     return;
   }
 
-  res.json({ reply: await createReplyText(text) });
+  res.json({ reply: await createReplyText(text, { publicBaseUrl: getRequestBaseUrl(req) }) });
 });
 
 if (hasLineConfig) {
   app.post('/webhook', line.middleware(lineConfig), async (req, res) => {
     try {
-      await Promise.all(req.body.events.map(handleEvent));
+      const publicBaseUrl = getRequestBaseUrl(req);
+      await Promise.all(req.body.events.map((event) => handleEvent(event, { publicBaseUrl })));
       res.sendStatus(200);
     } catch (error) {
       console.error(error);
@@ -195,7 +196,7 @@ if (hasLineConfig) {
   });
 }
 
-async function handleEvent(event) {
+async function handleEvent(event, options = {}) {
   if (!client) {
     return null;
   }
@@ -214,12 +215,17 @@ async function handleEvent(event) {
   }
 
   const userText = event.message.text.trim();
-  const replyText = await createReplyText(userText);
+  const replyText = await createReplyText(userText, options);
 
   return client.replyMessage({
     replyToken: event.replyToken,
     messages: [{ type: 'text', text: replyText }],
   });
+}
+
+function getRequestBaseUrl(req) {
+  const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
+  return `${protocol}://${req.get('host')}`;
 }
 
 app.use((error, req, res, next) => {

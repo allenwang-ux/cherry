@@ -13,7 +13,7 @@ export async function createReplyText(userText, options = {}) {
   }
 
   if (['填班', '我要填班', '班表系統', '開放填班'].includes(text)) {
-    return `請點這裡進入填班系統：\n${getScheduleUrl()}`;
+    return `請點這裡進入填班系統：\n${getScheduleUrl(options)}`;
   }
 
   if (text === '本週排班' || text === '這週排班') {
@@ -90,7 +90,19 @@ function getHelpText() {
   ].join('\n');
 }
 
-function getScheduleUrl() {
-  const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || 3000}`;
+function getScheduleUrl(options = {}) {
+  const configuredUrl = String(process.env.PUBLIC_BASE_URL || '').trim();
+  const requestUrl = String(options.publicBaseUrl || '').trim();
+  const fallbackUrl = `http://localhost:${process.env.PORT || 3000}`;
+  const baseUrl = isUsableBaseUrl(configuredUrl)
+    ? configuredUrl
+    : isUsableBaseUrl(requestUrl)
+      ? requestUrl
+      : fallbackUrl;
+
   return `${baseUrl.replace(/\/$/, '')}/schedule`;
+}
+
+function isUsableBaseUrl(value) {
+  return Boolean(value) && /^https?:\/\//.test(value) && !value.includes('TO_BE_FILLED');
 }
