@@ -4,7 +4,7 @@ import * as line from '@line/bot-sdk';
 import { createReplyText } from './bot.js';
 import { resolveLineActor } from './line-auth.js';
 import { renderSchedulePage } from './schedule-page.js';
-import { assignSchedule, getSchedules, upsertUserShift } from './sheets.js';
+import { assignSchedule, getSchedules, getSignupHistory, removeUserShift, upsertUserShift } from './sheets.js';
 
 const { LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, LIFF_ID, PORT = 3000 } = process.env;
 
@@ -79,13 +79,31 @@ app.post('/api/my-shifts', express.json(), async (req, res, next) => {
       idToken: req.body?.idToken,
       devProfile: req.body?.devProfile,
     });
-    const schedule = await upsertUserShift({
-      date: String(req.body?.date ?? ''),
-      shift: String(req.body?.shift ?? ''),
-      actor,
-      targetName: actor.isAdmin ? String(req.body?.targetName ?? '') : actor.displayName,
-    });
+    const date = String(req.body?.date ?? '');
+    const shift = String(req.body?.shift ?? '');
+    const targetName = actor.isAdmin ? String(req.body?.targetName ?? '') : actor.displayName;
+    const schedule = shift
+      ? await upsertUserShift({ date, shift, actor, targetName })
+      : await removeUserShift({ date, actor, targetName });
     res.json({ schedule });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/history', express.json(), async (req, res, next) => {
+  try {
+    const actor = await resolveLineActor({
+      idToken: req.body?.idToken,
+      devProfile: req.body?.devProfile,
+    });
+
+    if (!actor.isAdmin) {
+      res.status(403).json({ error: 'Only admins can view operation history.' });
+      return;
+    }
+
+    res.json({ history: await getSignupHistory(Number(req.body?.limit || 80)) });
   } catch (error) {
     next(error);
   }

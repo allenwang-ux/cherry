@@ -104,6 +104,33 @@ Bot 收到 `填班` 會回覆 `PUBLIC_BASE_URL/schedule`。
 - 自動新增或追加 `填班紀錄` 分頁
 - 紀錄填寫時間、LINE userId、顯示名稱、日期、班別、備註
 
+管理者功能：
+
+- 可看到所有員工欄位
+- 可點任何人的日期欄位代排班
+- 可用「移除班別」清空某人的某一天班別
+- 可在頁面查看最近操作紀錄，包含 LINE userId、顯示名稱、動作、日期、班別
+- 可按「輸出 PDF」，用瀏覽器列印視窗另存 PDF 或直接列印
+
+管理者設定方式：
+
+```text
+ADMIN_DISPLAY_NAMES=你的 LINE 顯示名稱
+```
+
+或用 LINE userId 設定，較穩定：
+
+```text
+ADMIN_LINE_USER_IDS=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+多人管理者用逗號分隔：
+
+```text
+ADMIN_DISPLAY_NAMES=王小明,店長
+ADMIN_LINE_USER_IDS=Uaaa,Ubbb
+```
+
 ## 不接 LINE 先測回覆
 
 ```bash

@@ -231,6 +231,59 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .admin-panel input {
       min-width: 140px;
     }
+    .admin-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-left: auto;
+    }
+    .history-panel {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      display: none;
+      margin: 0 auto 12px;
+      max-width: 1180px;
+      overflow: hidden;
+    }
+    .history-panel h2 {
+      background: #ffe9ef;
+      border-bottom: 1px solid var(--line);
+      font-size: 15px;
+      margin: 0;
+      padding: 10px 12px;
+    }
+    .history-list {
+      display: grid;
+      gap: 1px;
+      max-height: 220px;
+      overflow: auto;
+    }
+    .history-item {
+      background: #fff;
+      display: grid;
+      gap: 4px;
+      grid-template-columns: 150px 1fr;
+      padding: 9px 12px;
+    }
+    .history-time {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .history-main {
+      font-size: 13px;
+      font-weight: 800;
+      line-height: 1.45;
+    }
+    .history-user-id {
+      color: var(--muted);
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      word-break: break-all;
+    }
     .legend span {
       background: rgba(255, 255, 255, 0.9);
       border: 1px solid var(--line);
@@ -406,6 +459,66 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       td {
         height: 40px;
       }
+      .admin-tools {
+        margin-left: 0;
+        width: 100%;
+      }
+      .history-item {
+        grid-template-columns: 1fr;
+      }
+    }
+    @media print {
+      body {
+        background: #fff;
+      }
+      header,
+      main {
+        padding: 0;
+      }
+      .bow-mark,
+      .month-nav,
+      .dev-login,
+      .notice,
+      .admin-panel,
+      .legend,
+      .history-panel {
+        display: none !important;
+      }
+      .brand {
+        margin: 0 0 10px;
+      }
+      .user {
+        color: #555;
+      }
+      .table-wrap {
+        border: 1px solid #222;
+        border-radius: 0;
+        box-shadow: none;
+        max-width: none;
+        overflow: visible;
+      }
+      table {
+        font-size: 11px;
+        min-width: 0;
+      }
+      th,
+      td {
+        border-color: #222;
+        height: 28px;
+      }
+      th,
+      .date-head,
+      .date-cell,
+      tr.today td,
+      td.mine {
+        background: #fff !important;
+      }
+      .shift-code {
+        border: 0;
+        box-shadow: none;
+        color: #000;
+        padding: 0;
+      }
     }
   </style>
 </head>
@@ -435,7 +548,15 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       <select id="targetEmployee"></select>
       <input id="newEmployeeName" placeholder="新增員工姓名" aria-label="新增員工姓名">
       <button class="secondary" type="button" id="addEmployee">加入欄位</button>
+      <div class="admin-tools">
+        <button class="secondary" type="button" id="refreshHistory">操作紀錄</button>
+        <button class="secondary" type="button" id="printSchedule">輸出 PDF</button>
+      </div>
     </div>
+    <section class="history-panel" id="historyPanel" aria-label="操作紀錄">
+      <h2>最近操作紀錄</h2>
+      <div class="history-list" id="historyList"></div>
+    </section>
     <div class="legend">
       <span>點自己的欄位填班</span>
       <span>班別：${SHIFT_CODES.join(' / ')}</span>
@@ -454,7 +575,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       <div class="modal-date" id="modalDate"></div>
       <div class="shift-picker" id="shiftPicker"></div>
       <div class="modal-actions">
-        <button class="secondary" type="button" id="clearShift">清空</button>
+        <button class="secondary" type="button" id="clearShift">移除班別</button>
         <button class="secondary" type="button" id="cancelShift">取消</button>
         <button class="primary" type="button" id="saveShift">儲存</button>
       </div>
@@ -489,6 +610,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     const adminPanel = document.querySelector('#adminPanel');
     const targetEmployee = document.querySelector('#targetEmployee');
     const newEmployeeName = document.querySelector('#newEmployeeName');
+    const historyPanel = document.querySelector('#historyPanel');
+    const historyList = document.querySelector('#historyList');
 
     document.querySelector('#prevMonth').addEventListener('click', () => changeMonth(-1));
     document.querySelector('#nextMonth').addEventListener('click', () => changeMonth(1));
@@ -505,6 +628,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       newEmployeeName.value = '';
       render();
     });
+    document.querySelector('#refreshHistory').addEventListener('click', loadHistory);
+    document.querySelector('#printSchedule').addEventListener('click', () => window.print());
     document.querySelector('#devLoginButton').addEventListener('click', async () => {
       profile = {
         userId: 'dev-user',
@@ -570,6 +695,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       actor = data.actor;
       if (actor?.isAdmin) {
         user.textContent = profile.displayName + ' 管理者';
+        await loadHistory();
       }
     }
 
@@ -624,6 +750,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     function renderAdminPanel(staffNames) {
       if (!actor?.isAdmin) {
         adminPanel.style.display = 'none';
+        historyPanel.style.display = 'none';
         return;
       }
 
@@ -672,10 +799,6 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       }
 
       const shift = SHIFT_CODES.filter((code) => selectedShifts.has(code)).join('+');
-      if (!shift) {
-        showError('請至少選一個班別。');
-        return;
-      }
 
       const response = await fetch('/api/my-shifts', {
         method: 'POST',
@@ -698,9 +821,46 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       schedules = schedules.filter((schedule) => {
         return !(schedule.date === editingDate && schedule.employee === editingEmployee);
       });
-      schedules.push(data.schedule);
+      if (shift) {
+        schedules.push(data.schedule);
+      }
       dialog.close();
+      await loadHistory();
       render();
+    }
+
+    async function loadHistory() {
+      if (!actor?.isAdmin) return;
+
+      const response = await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken,
+          devProfile: profile,
+          limit: 80,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || '讀取操作紀錄失敗');
+        return;
+      }
+
+      historyPanel.style.display = 'block';
+      historyList.innerHTML = (data.history || []).map((record) => {
+        const userId = record.lineUserId ? \`<span class="history-user-id">LINE userId: \${escapeHtml(record.lineUserId)}</span>\` : '';
+        return \`
+          <div class="history-item">
+            <div class="history-time">\${escapeHtml(record.createdAt)}</div>
+            <div class="history-main">
+              \${escapeHtml(record.displayName)}｜\${escapeHtml(record.action)}｜\${escapeHtml(record.date)}｜\${escapeHtml(record.shift)}
+              \${userId}
+            </div>
+          </div>
+        \`;
+      }).join('') || '<div class="history-item"><div class="history-main">尚無操作紀錄</div></div>';
     }
 
     function getEmployeeShift(dateText, employeeName) {

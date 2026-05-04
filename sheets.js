@@ -197,6 +197,74 @@ export async function upsertUserShift({ date, shift, actor, targetName }) {
   return schedule;
 }
 
+export async function removeUserShift({ date, actor, targetName }) {
+  const employeeName = String(targetName || actor.displayName).trim();
+
+  if (!date || !employeeName) {
+    const error = new Error('Use valid date and employee name.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const sheets = createSheetsClient();
+  const { sheetName, columnMap, width } = await getScheduleSheetContext(sheets);
+  const schedules = await getSchedules();
+  const existing = schedules.find((schedule) => {
+    return schedule.date === date && schedule.employee === employeeName;
+  });
+
+  if (!existing) {
+    const error = new Error('Schedule row not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const emptyRow = Array.from({ length: width }, () => '');
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(sheetName)}!A${existing.rowNumber}:${toColumnLetter(width)}${existing.rowNumber}`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [emptyRow],
+    },
+  });
+
+  await appendSignupHistory(sheets, {
+    actor,
+    schedule: existing,
+    action: actor.displayName === employeeName ? '移除班別' : `代移除 ${employeeName}`,
+  });
+
+  return existing;
+}
+
+export async function getSignupHistory(limit = 80) {
+  const sheets = createSheetsClient();
+  await ensureHistorySheet(sheets);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: '填班紀錄!A2:G',
+  });
+
+  const rows = response.data.values ?? [];
+
+  return rows
+    .map((row) => ({
+      createdAt: String(row[0] ?? ''),
+      lineUserId: String(row[1] ?? ''),
+      displayName: String(row[2] ?? ''),
+      action: String(row[3] ?? ''),
+      date: String(row[4] ?? ''),
+      shift: String(row[5] ?? ''),
+      note: String(row[6] ?? ''),
+    }))
+    .filter((record) => record.createdAt)
+    .slice(-limit)
+    .reverse();
+}
+
 async function appendSignupHistory(sheets, record) {
   await ensureHistorySheet(sheets);
 
