@@ -1,4 +1,4 @@
-export const SHIFT_CODES = ['A', 'B', 'C', 'H', 'I'];
+export const SHIFT_CODES = ['A', 'B', 'C', 'H', 'I', 'X'];
 
 export function normalizeShiftCode(value) {
   return String(value ?? '')

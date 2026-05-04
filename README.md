@@ -46,8 +46,10 @@ npm run schedules
 班別固定支援：
 
 ```text
-A / B / C / H / I
+A / B / C / H / I / X
 ```
+
+其中 `X` 代表不能上班。
 
 ## 5. 啟動 LINE Bot webhook
 
@@ -111,6 +113,7 @@ Bot 收到 `填班` 會回覆 `PUBLIC_BASE_URL/schedule`。
 - 可用「移除班別」清空某人的某一天班別
 - 可在頁面查看最近操作紀錄，包含 LINE userId、顯示名稱、動作、日期、班別
 - 可按「輸出 PDF」，用瀏覽器列印視窗另存 PDF 或直接列印
+- 2026 年台灣休假日與週末會在月曆日期欄標紅
 
 管理者設定方式：
 

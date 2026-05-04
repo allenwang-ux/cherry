@@ -344,7 +344,18 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-size: 12px;
       margin-left: 3px;
     }
+    .holiday-name {
+      color: var(--weekend);
+      display: block;
+      font-size: 11px;
+      font-weight: 900;
+      line-height: 1.2;
+      margin-top: 2px;
+    }
     tr.weekend .date-cell {
+      color: var(--weekend);
+    }
+    tr.day-off .date-cell {
       color: var(--weekend);
     }
     tr.today td {
@@ -519,6 +530,10 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         color: #000;
         padding: 0;
       }
+      .holiday-name {
+        color: #000;
+        font-size: 9px;
+      }
     }
   </style>
 </head>
@@ -560,7 +575,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     <div class="legend">
       <span>點自己的欄位填班</span>
       <span>班別：${SHIFT_CODES.join(' / ')}</span>
+      <span>X：不能上班</span>
       <span>可複選，例如 A+I</span>
+      <span>紅字：台灣休假日</span>
     </div>
     <div class="table-wrap">
       <table aria-label="月份班表">
@@ -586,6 +603,24 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     const LIFF_ID = ${JSON.stringify(liffId)};
     const SHIFT_CODES = ${JSON.stringify(SHIFT_CODES)};
     const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const taiwanHolidays = {
+      '2026-01-01': '元旦',
+      '2026-02-16': '春節',
+      '2026-02-17': '春節',
+      '2026-02-18': '春節',
+      '2026-02-19': '春節',
+      '2026-02-20': '春節',
+      '2026-02-27': '和平紀念日',
+      '2026-04-03': '兒清連假',
+      '2026-04-06': '兒清連假',
+      '2026-05-01': '勞動節',
+      '2026-06-19': '端午節',
+      '2026-09-25': '中秋連假',
+      '2026-09-28': '教師節',
+      '2026-10-09': '國慶日',
+      '2026-10-26': '光復節',
+      '2026-12-25': '行憲紀念日',
+    };
 
     let profile = null;
     let actor = null;
@@ -714,11 +749,20 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       tableBody.innerHTML = dates.map((dateText) => {
         const date = parseDate(dateText);
         const weekend = date.getDay() === 0 || date.getDay() === 6;
-        const rowClass = [weekend ? 'weekend' : '', dateText === today ? 'today' : ''].filter(Boolean).join(' ');
+        const holidayName = taiwanHolidays[dateText] || '';
+        const dayOff = weekend || holidayName;
+        const rowClass = [
+          weekend ? 'weekend' : '',
+          dayOff ? 'day-off' : '',
+          dateText === today ? 'today' : '',
+        ].filter(Boolean).join(' ');
         const cells = staffNames.map((name) => renderCell(dateText, name)).join('');
         return \`
           <tr class="\${rowClass}">
-            <td class="date-cell">\${date.getDate()}<span class="weekday">\${weekdays[date.getDay()]}</span></td>
+            <td class="date-cell">
+              \${date.getDate()}<span class="weekday">\${weekdays[date.getDay()]}</span>
+              \${holidayName ? \`<span class="holiday-name">\${escapeHtml(holidayName)}</span>\` : ''}
+            </td>
             \${cells}
           </tr>
         \`;

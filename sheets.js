@@ -123,7 +123,7 @@ export async function upsertUserShift({ date, shift, actor, targetName }) {
   const employeeName = String(targetName || actor.displayName).trim();
 
   if (!date || !isAllowedShift(normalizedShift)) {
-    const error = new Error('Use valid date and shift codes: A, B, C, H, I.');
+    const error = new Error('Use valid date and shift codes: A, B, C, H, I, X.');
     error.statusCode = 400;
     throw error;
   }
