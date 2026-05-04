@@ -102,6 +102,17 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-size: 13px;
       margin-top: 2px;
     }
+    .role-badge {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--brand-dark);
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 900;
+      margin-top: 4px;
+      padding: 3px 8px;
+    }
     .month-nav {
       align-items: center;
       display: flex;
@@ -588,6 +599,10 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       .user {
         font-size: 11px;
       }
+      .role-badge {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
       .icon-button {
         height: 32px;
         width: 32px;
@@ -806,6 +821,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       <div class="brand-copy">
         <h1>清心填班系統</h1>
         <div class="user" id="user">登入中</div>
+        <div class="role-badge" id="roleBadge">確認權限中</div>
       </div>
     </div>
     <div class="month-nav" aria-label="月份切換">
@@ -919,6 +935,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     const tableBody = document.querySelector('#tableBody');
     const notice = document.querySelector('#notice');
     const user = document.querySelector('#user');
+    const roleBadge = document.querySelector('#roleBadge');
     const loginPanel = document.querySelector('#loginPanel');
     const loginCopy = document.querySelector('#loginCopy');
     const devLogin = document.querySelector('#devLogin');
@@ -1033,6 +1050,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       loginPanel.style.display = 'flex';
       notice.style.display = 'none';
       user.textContent = '尚未登入';
+      roleBadge.textContent = '尚未登入';
     }
 
     async function loadSchedules(options = {}) {
@@ -1078,14 +1096,17 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       actor = data.actor;
       if (actor?.isRemoved) {
         user.textContent = profile.displayName;
+        roleBadge.textContent = '已移除';
         showError('此帳號已被管理員從員工名單移除。');
         return false;
       }
       if (actor?.isAdmin) {
         user.textContent = actor.displayName + ' 管理者';
+        roleBadge.textContent = '管理員模式';
         await loadHistory();
       } else {
         user.textContent = actor.displayName;
+        roleBadge.textContent = '員工模式';
       }
       profile.displayName = actor.displayName;
       renderProfilePanel();
@@ -1114,6 +1135,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         .join('') + '</tr>';
 
       renderAdminPanel(staffNames);
+      renderEditableHint(staffNames);
 
       tableBody.innerHTML = dates.map((dateText) => {
         const date = parseDate(dateText);
@@ -1173,6 +1195,14 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       if (current && staffNames.includes(current)) {
         targetEmployee.value = current;
       }
+    }
+
+    function renderEditableHint(staffNames) {
+      if (!actor || actor.isRemoved || actor.isAdmin || staffNames.includes(actor.displayName)) {
+        return;
+      }
+
+      showError('目前沒有找到你的欄位，請先用「我的名稱」改成班表上的姓名，或請管理員加入欄位。');
     }
 
     async function renameSelf() {

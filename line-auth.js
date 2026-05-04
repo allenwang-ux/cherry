@@ -5,6 +5,8 @@ const {
   ADMIN_DISPLAY_NAMES = '',
 } = process.env;
 
+const BUILT_IN_ADMIN_DISPLAY_NAMES = ['FengFengWang', 'cherrywu'];
+
 export async function resolveLineActor({ idToken, devProfile } = {}) {
   if (idToken && LINE_LOGIN_CHANNEL_ID) {
     return withAdminRole(await verifyLineIdToken(idToken));
@@ -31,7 +33,7 @@ function withAdminRole(actor) {
 
 function isAdmin(actor) {
   const adminUserIds = parseList(ADMIN_LINE_USER_IDS);
-  const adminDisplayNames = [...parseList(ADMIN_DISPLAY_NAMES), 'cherrywu'].map(normalizeName);
+  const adminDisplayNames = [...parseList(ADMIN_DISPLAY_NAMES), ...BUILT_IN_ADMIN_DISPLAY_NAMES].map(normalizeName);
 
   return adminUserIds.includes(actor.userId) || adminDisplayNames.includes(normalizeName(actor.displayName));
 }
