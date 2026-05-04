@@ -16,6 +16,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       --line-strong: #e78298;
       --brand: #e83f67;
       --brand-dark: #b91f47;
+      --ribbon: #ff7fa1;
+      --ribbon-dark: #cc2f59;
+      --soft-pink: #fff0f5;
       --bg: #fff6f8;
       --panel: #ffffff;
       --cream: #fffaf0;
@@ -33,6 +36,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background:
         radial-gradient(circle at 18px 18px, rgba(232, 63, 103, 0.08) 0 2px, transparent 3px),
+        radial-gradient(circle at 40px 40px, rgba(255, 127, 161, 0.07) 0 1px, transparent 2px),
         linear-gradient(135deg, #fff8fb 0%, #fff2f5 42%, #fffaf0 100%);
       background-size: 42px 42px, auto;
       color: var(--ink);
@@ -53,6 +57,23 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       z-index: 20;
       box-shadow: 0 10px 28px rgba(180, 63, 95, 0.1);
     }
+    header::after {
+      background:
+        linear-gradient(135deg, transparent 0 42%, var(--ribbon) 43% 57%, transparent 58%),
+        linear-gradient(45deg, transparent 0 42%, var(--ribbon) 43% 57%, transparent 58%);
+      border: 3px solid #fff;
+      border-radius: 999px 999px 999px 18px;
+      box-shadow: 0 6px 16px rgba(232, 63, 103, 0.18);
+      content: "";
+      height: 38px;
+      opacity: 0.9;
+      position: absolute;
+      right: 14px;
+      top: 100%;
+      transform: translateY(-12px) rotate(-10deg);
+      width: 54px;
+      z-index: -1;
+    }
     .brand {
       align-items: center;
       display: flex;
@@ -67,6 +88,14 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       line-height: 1.2;
       margin: 0;
       letter-spacing: 0;
+      position: relative;
+    }
+    h1::after {
+      color: var(--ribbon);
+      content: "♡";
+      font-size: 14px;
+      margin-left: 6px;
+      vertical-align: 2px;
     }
     .user {
       color: var(--muted);
@@ -102,6 +131,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       background: var(--brand);
       border-color: var(--brand);
       color: #fff;
+      transform: translateY(-1px);
     }
     .month-title {
       color: var(--ink);
@@ -117,7 +147,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       background: #fff;
       border: 2px solid #fff;
       border-radius: 18px;
-      box-shadow: 0 10px 22px rgba(40, 82, 63, 0.16);
+      box-shadow:
+        0 10px 22px rgba(40, 82, 63, 0.16),
+        0 0 0 5px rgba(255, 240, 245, 0.85);
       flex: 0 0 auto;
       height: 58px;
       object-fit: cover;
@@ -177,6 +209,35 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       min-height: 42px;
       padding: 10px 18px;
     }
+    .login-panel,
+    .profile-panel,
+    .admin-panel,
+    .history-panel,
+    .table-wrap,
+    dialog {
+      position: relative;
+    }
+    .login-panel::before,
+    .profile-panel::before,
+    .admin-panel::before,
+    .table-wrap::before,
+    dialog::before {
+      background: var(--ribbon);
+      border: 2px solid #fff;
+      border-radius: 50% 50% 45% 45%;
+      box-shadow:
+        -13px 2px 0 -1px var(--ribbon),
+        13px 2px 0 -1px var(--ribbon),
+        0 2px 0 2px #fff,
+        0 8px 14px rgba(232, 63, 103, 0.18);
+      content: "";
+      height: 13px;
+      position: absolute;
+      right: 18px;
+      top: -8px;
+      width: 18px;
+      z-index: 2;
+    }
     .notice {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -188,6 +249,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       padding: 14px;
     }
     .notice.error {
+      background: #fff7f7;
+      border-color: #f0a2a2;
       color: var(--danger);
     }
     .legend {
@@ -312,8 +375,16 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       box-shadow: 0 8px 18px rgba(180, 63, 95, 0.08);
       padding: 7px 11px;
     }
+    .legend span::before {
+      color: var(--ribbon);
+      content: "♡";
+      font-size: 11px;
+      margin-right: 5px;
+    }
     .table-wrap {
-      background: var(--panel);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 250, 252, 0.96)),
+        var(--panel);
       border: 2px solid var(--line);
       border-radius: 18px;
       box-shadow: var(--shadow);
@@ -342,7 +413,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       vertical-align: middle;
     }
     th {
-      background: #ffe9ef;
+      background: linear-gradient(180deg, #fff7fa, #ffe3ec);
       color: var(--ink);
       font-size: 14px;
       font-weight: 900;
@@ -358,10 +429,10 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       z-index: 4;
     }
     .date-head {
-      background: #ffdbe5;
+      background: linear-gradient(180deg, #ffeaf1, #ffd5e2);
     }
     .date-cell {
-      background: #fffafc;
+      background: linear-gradient(180deg, #fffafd, #fff0f5);
       color: var(--ink);
       font-weight: 800;
     }
@@ -386,10 +457,12 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       color: var(--weekend);
     }
     tr.today td {
-      background: var(--today);
+      background: #fff4cf;
     }
     td.mine {
-      background: var(--mine);
+      background:
+        radial-gradient(circle at 8px 8px, rgba(232, 63, 103, 0.08) 0 2px, transparent 3px),
+        var(--mine);
       cursor: pointer;
       font-weight: 900;
     }
@@ -402,7 +475,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       background: #fff;
       border: 1px solid var(--line-strong);
       border-radius: 999px;
-      box-shadow: 0 4px 10px rgba(180, 63, 95, 0.1);
+      box-shadow:
+        inset 0 -2px 0 rgba(255, 205, 218, 0.45),
+        0 4px 10px rgba(180, 63, 95, 0.1);
       color: var(--brand-dark);
       display: inline-block;
       font-size: 16px;
@@ -427,7 +502,10 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       background: rgba(15, 23, 42, 0.32);
     }
     .modal {
-      background: linear-gradient(180deg, #fff, #fff6f8);
+      background:
+        radial-gradient(circle at 22px 22px, rgba(232, 63, 103, 0.08) 0 2px, transparent 3px),
+        linear-gradient(180deg, #fff, #fff6f8);
+      background-size: 36px 36px, auto;
       padding: 20px;
     }
     .modal h2 {
@@ -476,6 +554,11 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-weight: 800;
       padding: 10px 12px;
     }
+    .secondary:hover,
+    .shift-option:hover {
+      border-color: var(--ribbon);
+      box-shadow: 0 6px 14px rgba(232, 63, 103, 0.12);
+    }
     @media (max-width: 720px) {
       header {
         align-items: center;
@@ -490,6 +573,14 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         border-radius: 12px;
         height: 40px;
         width: 40px;
+      }
+      header::after,
+      .login-panel::before,
+      .profile-panel::before,
+      .admin-panel::before,
+      .table-wrap::before,
+      dialog::before {
+        display: none;
       }
       h1 {
         font-size: 15px;
