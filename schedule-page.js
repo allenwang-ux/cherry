@@ -137,6 +137,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       padding: 10px 12px;
     }
     .dev-login button,
+    .line-login-button,
     .primary {
       background: linear-gradient(180deg, #f05278, var(--brand));
       border: 0;
@@ -147,6 +148,34 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-size: 15px;
       font-weight: 900;
       padding: 10px 12px;
+    }
+    .login-panel {
+      align-items: center;
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      display: none;
+      gap: 12px;
+      justify-content: space-between;
+      margin: 0 auto 12px;
+      max-width: 820px;
+      padding: 14px;
+    }
+    .login-title {
+      font-size: 16px;
+      font-weight: 900;
+      margin-bottom: 3px;
+    }
+    .login-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .line-login-button {
+      flex: 0 0 auto;
+      min-height: 42px;
+      padding: 10px 18px;
     }
     .notice {
       background: var(--panel);
@@ -471,6 +500,17 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         margin-bottom: 6px;
         padding: 8px 10px;
       }
+      .login-panel {
+        align-items: stretch;
+        border-radius: 12px;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 6px;
+        padding: 10px;
+      }
+      .line-login-button {
+        width: 100%;
+      }
       .legend {
         gap: 4px;
         margin-bottom: 6px;
@@ -585,6 +625,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       .brand-logo,
       .month-nav,
       .dev-login,
+      .login-panel,
       .notice,
       .admin-panel,
       .legend,
@@ -649,6 +690,13 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     </div>
   </header>
   <main>
+    <section class="login-panel" id="loginPanel" aria-label="LINE 登入">
+      <div>
+        <div class="login-title">請先登入 LINE</div>
+        <div class="login-copy" id="loginCopy">登入後會自動把你的 LINE 名稱加入班表欄位。</div>
+      </div>
+      <button class="line-login-button" type="button" id="lineLoginButton">使用 LINE 登入</button>
+    </section>
     <div class="dev-login" id="devLogin">
       <input id="devName" value="測試員工" aria-label="測試名稱">
       <button type="button" id="devLoginButton">使用測試身份</button>
@@ -735,6 +783,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     const tableBody = document.querySelector('#tableBody');
     const notice = document.querySelector('#notice');
     const user = document.querySelector('#user');
+    const loginPanel = document.querySelector('#loginPanel');
+    const loginCopy = document.querySelector('#loginCopy');
     const devLogin = document.querySelector('#devLogin');
     const devName = document.querySelector('#devName');
     const monthTitle = document.querySelector('#monthTitle');
@@ -759,6 +809,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     document.querySelector('#removeEmployee').addEventListener('click', removeEmployee);
     document.querySelector('#refreshHistory').addEventListener('click', loadHistory);
     document.querySelector('#printSchedule').addEventListener('click', () => window.print());
+    document.querySelector('#lineLoginButton').addEventListener('click', () => startLineLogin(true));
     document.querySelector('#devLoginButton').addEventListener('click', async () => {
       profile = {
         userId: 'dev-user',
@@ -779,16 +830,14 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         if (LIFF_ID) {
           await liff.init({ liffId: LIFF_ID });
           if (!liff.isLoggedIn()) {
-            liff.login();
+            showLoginPrompt('請點下方按鈕登入 LINE，登入後就可以填班。');
             return;
           }
-          profile = await liff.getProfile();
-          idToken = liff.getIDToken();
-          user.textContent = profile.displayName;
-          const sessionOk = await loadSession();
-          if (!sessionOk) return;
-          await loadSchedules();
-          startLiveRefresh();
+          const sessionOk = await completeLineSession();
+          if (sessionOk) {
+            await loadSchedules();
+            startLiveRefresh();
+          }
           return;
         }
 
@@ -797,8 +846,49 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         user.textContent = '測試模式';
         render();
       } catch (error) {
+        if (isLoginError(error)) {
+          showLoginPrompt('LINE 登入狀態已失效，請重新登入。');
+          return;
+        }
+
         showError(error.message || '登入失敗');
       }
+    }
+
+    async function completeLineSession() {
+      profile = await liff.getProfile();
+      idToken = liff.getIDToken();
+      if (!idToken) {
+        showLoginPrompt('目前沒有取得 LINE 登入授權，請重新登入。');
+        return false;
+      }
+
+      user.textContent = profile.displayName;
+      const sessionOk = await loadSession();
+      if (!sessionOk) return false;
+      loginPanel.style.display = 'none';
+      return true;
+    }
+
+    function startLineLogin(force = false) {
+      if (!LIFF_ID) {
+        showError('尚未設定 LIFF ID，暫時無法使用 LINE 登入。');
+        return;
+      }
+
+      if (force && window.liff?.isLoggedIn?.()) {
+        liff.logout();
+      }
+
+      const redirectUri = window.location.origin + window.location.pathname;
+      liff.login({ redirectUri });
+    }
+
+    function showLoginPrompt(message) {
+      loginCopy.textContent = message;
+      loginPanel.style.display = 'flex';
+      notice.style.display = 'none';
+      user.textContent = '尚未登入';
     }
 
     async function loadSchedules(options = {}) {
@@ -1141,6 +1231,11 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       notice.style.display = 'block';
       notice.className = 'notice error';
       notice.textContent = message;
+    }
+
+    function isLoginError(error) {
+      const message = String(error?.message || '');
+      return message.includes('LINE login') || message.includes('Invalid LINE') || message.includes('登入');
     }
 
     function escapeHtml(value) {
