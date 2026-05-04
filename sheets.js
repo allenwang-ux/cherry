@@ -8,6 +8,9 @@ const {
   GOOGLE_PRIVATE_KEY,
 } = process.env;
 
+const EMPLOYEE_SHEET_NAME = '員工名單';
+const HISTORY_SHEET_NAME = '填班紀錄';
+
 function assertGoogleSheetsEnv() {
   if (!GOOGLE_SHEET_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
     throw new Error('Missing Google Sheets env vars. Copy .env.example to .env and fill it in.');
@@ -63,6 +66,164 @@ export async function getSchedules() {
 export async function getSchedulesByDate(dateText) {
   const schedules = await getSchedules();
   return schedules.filter((schedule) => schedule.date === dateText);
+}
+
+export async function getEmployees() {
+  const sheets = createSheetsClient();
+  const records = await getEmployeeRecords(sheets);
+
+  return records
+    .filter((record) => record.status === 'active' && record.displayName)
+    .map((record) => ({
+      lineUserId: record.lineUserId,
+      displayName: record.displayName,
+    }));
+}
+
+export async function registerEmployee(actor) {
+  const sheets = createSheetsClient();
+  const records = await getEmployeeRecords(sheets);
+  const existing = records.find((record) => {
+    return (actor.userId && record.lineUserId === actor.userId) || record.displayName === actor.displayName;
+  });
+
+  if (existing) {
+    if (existing.status === 'removed') {
+      return {
+        ...actor,
+        isRemoved: true,
+      };
+    }
+
+    const updates = [];
+    if (!existing.lineUserId && actor.userId) {
+      updates.push({
+        range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!B${existing.rowNumber}`,
+        values: [[actor.userId]],
+      });
+    }
+    if (existing.displayName !== actor.displayName) {
+      updates.push({
+        range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!C${existing.rowNumber}`,
+        values: [[actor.displayName]],
+      });
+    }
+
+    for (const update of updates) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: update.range,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: update.values },
+      });
+    }
+
+    return {
+      ...actor,
+      isRemoved: false,
+    };
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:D`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[formatTaipeiDateTime(new Date()), actor.userId, actor.displayName, 'active']],
+    },
+  });
+
+  await appendSignupHistory(sheets, {
+    actor,
+    action: '登入加入員工名單',
+    schedule: {},
+  });
+
+  return {
+    ...actor,
+    isRemoved: false,
+  };
+}
+
+export async function addEmployeeByName({ actor, displayName }) {
+  const employeeName = String(displayName || '').trim();
+
+  if (!employeeName) {
+    const error = new Error('Employee name is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const sheets = createSheetsClient();
+  const records = await getEmployeeRecords(sheets);
+  const existing = records.find((record) => record.displayName === employeeName);
+
+  if (existing) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!D${existing.rowNumber}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [['active']],
+      },
+    });
+  } else {
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:D`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[formatTaipeiDateTime(new Date()), '', employeeName, 'active']],
+      },
+    });
+  }
+
+  await appendSignupHistory(sheets, {
+    actor,
+    action: `新增員工 ${employeeName}`,
+    schedule: {},
+  });
+
+  return { displayName: employeeName };
+}
+
+export async function removeEmployeeByName({ actor, displayName }) {
+  const employeeName = String(displayName || '').trim();
+
+  if (!employeeName) {
+    const error = new Error('Employee name is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const sheets = createSheetsClient();
+  const records = await getEmployeeRecords(sheets);
+  const matched = records.filter((record) => record.displayName === employeeName);
+
+  if (matched.length === 0) {
+    const error = new Error('Employee not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  for (const record of matched) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!D${record.rowNumber}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [['removed']],
+      },
+    });
+  }
+
+  await appendSignupHistory(sheets, {
+    actor,
+    action: `移除員工 ${employeeName}`,
+    schedule: {},
+  });
+
+  return { displayName: employeeName };
 }
 
 export async function assignSchedule(rowNumber, actor) {
@@ -245,7 +406,7 @@ export async function getSignupHistory(limit = 80) {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: '填班紀錄!A2:G',
+    range: `${quoteSheetName(HISTORY_SHEET_NAME)}!A2:G`,
   });
 
   const rows = response.data.values ?? [];
@@ -270,7 +431,7 @@ async function appendSignupHistory(sheets, record) {
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: '填班紀錄!A:G',
+    range: `${quoteSheetName(HISTORY_SHEET_NAME)}!A:G`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [
@@ -279,9 +440,9 @@ async function appendSignupHistory(sheets, record) {
           record.actor.userId,
           record.actor.displayName,
           record.action,
-          record.schedule.date,
-          record.schedule.shift,
-          record.schedule.note,
+          record.schedule?.date || '',
+          record.schedule?.shift || '',
+          record.schedule?.note || '',
         ],
       ],
     },
@@ -289,12 +450,7 @@ async function appendSignupHistory(sheets, record) {
 }
 
 async function ensureHistorySheet(sheets) {
-  const spreadsheet = await sheets.spreadsheets.get({
-    spreadsheetId: GOOGLE_SHEET_ID,
-  });
-
-  const exists = spreadsheet.data.sheets.some((sheet) => sheet.properties.title === '填班紀錄');
-  if (exists) {
+  if (await sheetExists(sheets, HISTORY_SHEET_NAME)) {
     return;
   }
 
@@ -305,7 +461,7 @@ async function ensureHistorySheet(sheets) {
         {
           addSheet: {
             properties: {
-              title: '填班紀錄',
+              title: HISTORY_SHEET_NAME,
             },
           },
         },
@@ -315,12 +471,71 @@ async function ensureHistorySheet(sheets) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: '填班紀錄!A1:G1',
+    range: `${quoteSheetName(HISTORY_SHEET_NAME)}!A1:G1`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [['填寫時間', 'LINE userId', '顯示名稱', '動作', '日期', '班別', '備註']],
     },
   });
+}
+
+async function getEmployeeRecords(sheets) {
+  await ensureEmployeeSheet(sheets);
+
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A2:D`,
+  });
+
+  const rows = response.data.values ?? [];
+
+  return rows
+    .map((row, index) => ({
+      rowNumber: index + 2,
+      joinedAt: String(row[0] ?? ''),
+      lineUserId: String(row[1] ?? ''),
+      displayName: String(row[2] ?? ''),
+      status: String(row[3] ?? 'active') || 'active',
+    }))
+    .filter((record) => record.displayName);
+}
+
+async function ensureEmployeeSheet(sheets) {
+  if (await sheetExists(sheets, EMPLOYEE_SHEET_NAME)) {
+    return;
+  }
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    requestBody: {
+      requests: [
+        {
+          addSheet: {
+            properties: {
+              title: EMPLOYEE_SHEET_NAME,
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A1:D1`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [['加入時間', 'LINE userId', '顯示名稱', '狀態']],
+    },
+  });
+}
+
+async function sheetExists(sheets, sheetName) {
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+  });
+
+  return spreadsheet.data.sheets.some((sheet) => sheet.properties.title === sheetName);
 }
 
 async function getScheduleSheetContext(sheets) {

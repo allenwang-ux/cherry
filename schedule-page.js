@@ -534,6 +534,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       <select id="targetEmployee"></select>
       <input id="newEmployeeName" placeholder="新增員工姓名" aria-label="新增員工姓名">
       <button class="secondary" type="button" id="addEmployee">加入欄位</button>
+      <button class="secondary" type="button" id="removeEmployee">移除員工</button>
       <div class="admin-tools">
         <button class="secondary" type="button" id="refreshHistory">操作紀錄</button>
         <button class="secondary" type="button" id="printSchedule">輸出 PDF</button>
@@ -597,11 +598,11 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     let actor = null;
     let idToken = '';
     let schedules = [];
+    let employees = [];
     let activeMonth = new Date();
     let editingDate = '';
     let editingEmployee = '';
     let selectedShifts = new Set();
-    let staffOverrides = [];
 
     const tableHead = document.querySelector('#tableHead');
     const tableBody = document.querySelector('#tableBody');
@@ -627,13 +628,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       renderShiftPicker();
     });
     document.querySelector('#saveShift').addEventListener('click', saveShift);
-    document.querySelector('#addEmployee').addEventListener('click', () => {
-      const name = newEmployeeName.value.trim();
-      if (!name) return;
-      staffOverrides.push(name);
-      newEmployeeName.value = '';
-      render();
-    });
+    document.querySelector('#addEmployee').addEventListener('click', addEmployee);
+    document.querySelector('#removeEmployee').addEventListener('click', removeEmployee);
     document.querySelector('#refreshHistory').addEventListener('click', loadHistory);
     document.querySelector('#printSchedule').addEventListener('click', () => window.print());
     document.querySelector('#devLoginButton').addEventListener('click', async () => {
@@ -643,7 +639,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       };
       user.textContent = profile.displayName;
       devLogin.style.display = 'none';
-      await loadSession();
+      const sessionOk = await loadSession();
+      if (!sessionOk) return;
       await loadSchedules();
     });
 
@@ -660,7 +657,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
           profile = await liff.getProfile();
           idToken = liff.getIDToken();
           user.textContent = profile.displayName;
-          await loadSession();
+          const sessionOk = await loadSession();
+          if (!sessionOk) return;
           await loadSchedules();
           return;
         }
@@ -681,6 +679,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       const response = await fetch('/api/schedules');
       const data = await response.json();
       schedules = data.schedules || [];
+      employees = data.employees || [];
       notice.style.display = 'none';
       render();
     }
@@ -699,10 +698,16 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         throw new Error(data.error || '登入狀態讀取失敗');
       }
       actor = data.actor;
+      if (actor?.isRemoved) {
+        user.textContent = profile.displayName;
+        showError('此帳號已被管理員從員工名單移除。');
+        return false;
+      }
       if (actor?.isAdmin) {
         user.textContent = profile.displayName + ' 管理者';
         await loadHistory();
       }
+      return true;
     }
 
     function render() {
@@ -756,9 +761,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     }
 
     function getStaffNames() {
-      const names = schedules.map((schedule) => schedule.employee).filter(Boolean);
-      if (profile?.displayName) names.push(profile.displayName);
-      names.push(...staffOverrides);
+      const names = employees.map((employee) => employee.displayName).filter(Boolean);
       return [...new Set(names)];
     }
 
@@ -876,6 +879,63 @@ export function renderSchedulePage({ liffId = '' } = {}) {
           </div>
         \`;
       }).join('') || '<div class="history-item"><div class="history-main">尚無操作紀錄</div></div>';
+    }
+
+    async function addEmployee() {
+      const name = newEmployeeName.value.trim();
+      if (!name) return;
+
+      const response = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: name,
+          idToken,
+          devProfile: profile,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || '新增員工失敗');
+        return;
+      }
+
+      newEmployeeName.value = '';
+      await loadSchedules();
+      await loadHistory();
+    }
+
+    async function removeEmployee() {
+      const name = targetEmployee.value;
+      if (!name) return;
+
+      if (name === profile?.displayName) {
+        showError('不能移除目前登入的管理員。');
+        return;
+      }
+
+      const confirmed = window.confirm(\`確定要移除 \${name} 嗎？移除後此人不會出現在欄位中。\`);
+      if (!confirmed) return;
+
+      const response = await fetch('/api/employees/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName: name,
+          idToken,
+          devProfile: profile,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || '移除員工失敗');
+        return;
+      }
+
+      await loadSchedules();
+      await loadHistory();
     }
 
     function getEmployeeShift(dateText, employeeName) {

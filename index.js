@@ -4,7 +4,17 @@ import * as line from '@line/bot-sdk';
 import { createReplyText } from './bot.js';
 import { resolveLineActor } from './line-auth.js';
 import { renderSchedulePage } from './schedule-page.js';
-import { assignSchedule, getSchedules, getSignupHistory, removeUserShift, upsertUserShift } from './sheets.js';
+import {
+  addEmployeeByName,
+  assignSchedule,
+  getEmployees,
+  getSchedules,
+  getSignupHistory,
+  registerEmployee,
+  removeEmployeeByName,
+  removeUserShift,
+  upsertUserShift,
+} from './sheets.js';
 
 const { LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET, LIFF_ID, PORT = 3000 } = process.env;
 
@@ -44,7 +54,10 @@ app.get('/healthz', (req, res) => {
 
 app.get('/api/schedules', async (req, res, next) => {
   try {
-    res.json({ schedules: await getSchedules() });
+    res.json({
+      schedules: await getSchedules(),
+      employees: await getEmployees(),
+    });
   } catch (error) {
     next(error);
   }
@@ -56,7 +69,7 @@ app.post('/api/session', express.json(), async (req, res, next) => {
       idToken: req.body?.idToken,
       devProfile: req.body?.devProfile,
     });
-    res.json({ actor });
+    res.json({ actor: await registerEmployee(actor) });
   } catch (error) {
     next(error);
   }
@@ -81,6 +94,10 @@ app.post('/api/my-shifts', express.json(), async (req, res, next) => {
       idToken: req.body?.idToken,
       devProfile: req.body?.devProfile,
     });
+    if (actor.isRemoved) {
+      res.status(403).json({ error: '此帳號已被管理員從員工名單移除。' });
+      return;
+    }
     const date = String(req.body?.date ?? '');
     const shift = String(req.body?.shift ?? '');
     const targetName = actor.isAdmin ? String(req.body?.targetName ?? '') : actor.displayName;
@@ -106,6 +123,46 @@ app.post('/api/history', express.json(), async (req, res, next) => {
     }
 
     res.json({ history: await getSignupHistory(Number(req.body?.limit || 80)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/employees', express.json(), async (req, res, next) => {
+  try {
+    const actor = await resolveLineActor({
+      idToken: req.body?.idToken,
+      devProfile: req.body?.devProfile,
+    });
+
+    if (!actor.isAdmin) {
+      res.status(403).json({ error: 'Only admins can manage employees.' });
+      return;
+    }
+
+    res.json({ employee: await addEmployeeByName({ actor, displayName: req.body?.displayName }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/employees/remove', express.json(), async (req, res, next) => {
+  try {
+    const actor = await resolveLineActor({
+      idToken: req.body?.idToken,
+      devProfile: req.body?.devProfile,
+    });
+
+    if (!actor.isAdmin) {
+      res.status(403).json({ error: 'Only admins can manage employees.' });
+      return;
+    }
+    if (actor.displayName === String(req.body?.displayName || '').trim()) {
+      res.status(400).json({ error: '不能移除目前登入的管理員。' });
+      return;
+    }
+
+    res.json({ employee: await removeEmployeeByName({ actor, displayName: req.body?.displayName }) });
   } catch (error) {
     next(error);
   }
