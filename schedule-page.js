@@ -746,6 +746,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     <div class="admin-panel" id="adminPanel">
       <label for="targetEmployee">管理排班</label>
       <select id="targetEmployee"></select>
+      <button class="secondary" type="button" id="moveEmployeeLeft">上移</button>
+      <button class="secondary" type="button" id="moveEmployeeRight">下移</button>
       <input id="renameEmployeeName" placeholder="改成新姓名" aria-label="改成新姓名">
       <button class="secondary" type="button" id="renameEmployee">修改名稱</button>
       <input id="newEmployeeName" placeholder="新增員工姓名" aria-label="新增員工姓名">
@@ -858,6 +860,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     document.querySelector('#lineLoginButton').addEventListener('click', () => startLineLogin(true));
     document.querySelector('#renameSelf').addEventListener('click', renameSelf);
     document.querySelector('#renameEmployee').addEventListener('click', renameSelectedEmployee);
+    document.querySelector('#moveEmployeeLeft').addEventListener('click', () => moveSelectedEmployee(-1));
+    document.querySelector('#moveEmployeeRight').addEventListener('click', () => moveSelectedEmployee(1));
     document.querySelector('#devLoginButton').addEventListener('click', async () => {
       profile = {
         userId: 'dev-user',
@@ -1129,6 +1133,32 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         renderProfilePanel();
       }
       await loadSchedules();
+      await loadHistory();
+    }
+
+    async function moveSelectedEmployee(direction) {
+      const displayName = targetEmployee.value;
+      if (!displayName) return;
+
+      const response = await fetch('/api/employees/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          displayName,
+          direction,
+          idToken,
+          devProfile: profile,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || '調整員工位置失敗');
+        return;
+      }
+
+      await loadSchedules();
+      targetEmployee.value = displayName;
       await loadHistory();
     }
 

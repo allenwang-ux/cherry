@@ -74,9 +74,11 @@ export async function getEmployees() {
 
   return records
     .filter((record) => record.status === 'active' && record.displayName)
+    .sort(compareEmployeeRecords)
     .map((record) => ({
       lineUserId: record.lineUserId,
       displayName: record.displayName,
+      sortOrder: record.sortOrder,
     }));
 }
 
@@ -121,10 +123,10 @@ export async function registerEmployee(actor) {
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:D`,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:E`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [[formatTaipeiDateTime(new Date()), actor.userId, actor.displayName, 'active']],
+      values: [[formatTaipeiDateTime(new Date()), actor.userId, actor.displayName, 'active', getNextSortOrder(records)]],
     },
   });
 
@@ -162,13 +164,24 @@ export async function addEmployeeByName({ actor, displayName }) {
         values: [['active']],
       },
     });
+
+    if (!existing.sortOrder) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: GOOGLE_SHEET_ID,
+        range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!E${existing.rowNumber}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: {
+          values: [[getNextSortOrder(records)]],
+        },
+      });
+    }
   } else {
     await sheets.spreadsheets.values.append({
       spreadsheetId: GOOGLE_SHEET_ID,
-      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:D`,
+      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:E`,
       valueInputOption: 'USER_ENTERED',
       requestBody: {
-        values: [[formatTaipeiDateTime(new Date()), '', employeeName, 'active']],
+        values: [[formatTaipeiDateTime(new Date()), '', employeeName, 'active', getNextSortOrder(records)]],
       },
     });
   }
@@ -245,6 +258,69 @@ export async function renameEmployee({ actor, currentName, newName }) {
   });
 
   return { displayName: nextName };
+}
+
+export async function moveEmployee({ actor, displayName, direction }) {
+  const employeeName = String(displayName || '').trim();
+  const offset = Number(direction);
+
+  if (!actor.isAdmin) {
+    const error = new Error('Only admins can reorder employees.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (!employeeName || ![-1, 1].includes(offset)) {
+    const error = new Error('Use valid employee name and direction.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const sheets = createSheetsClient();
+  const records = (await getEmployeeRecords(sheets))
+    .filter((record) => record.status === 'active')
+    .sort(compareEmployeeRecords);
+  const currentIndex = records.findIndex((record) => record.displayName === employeeName);
+
+  if (currentIndex < 0) {
+    const error = new Error('Employee not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const targetIndex = currentIndex + offset;
+  if (targetIndex < 0 || targetIndex >= records.length) {
+    return {
+      displayName: employeeName,
+      moved: false,
+    };
+  }
+
+  const orderedRecords = [...records];
+  const [movedRecord] = orderedRecords.splice(currentIndex, 1);
+  orderedRecords.splice(targetIndex, 0, movedRecord);
+
+  for (const [index, record] of orderedRecords.entries()) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!E${record.rowNumber}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[index + 1]],
+      },
+    });
+  }
+
+  await appendSignupHistory(sheets, {
+    actor,
+    action: offset < 0 ? `上移員工 ${employeeName}` : `下移員工 ${employeeName}`,
+    schedule: {},
+  });
+
+  return {
+    displayName: employeeName,
+    moved: true,
+  };
 }
 
 export async function removeEmployeeByName({ actor, displayName }) {
@@ -580,7 +656,7 @@ async function getEmployeeRecords(sheets) {
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A2:D`,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A2:E`,
   });
 
   const rows = response.data.values ?? [];
@@ -592,12 +668,14 @@ async function getEmployeeRecords(sheets) {
       lineUserId: String(row[1] ?? ''),
       displayName: String(row[2] ?? ''),
       status: String(row[3] ?? 'active') || 'active',
+      sortOrder: Number(row[4]) || index + 1,
     }))
     .filter((record) => record.displayName);
 }
 
 async function ensureEmployeeSheet(sheets) {
   if (await sheetExists(sheets, EMPLOYEE_SHEET_NAME)) {
+    await ensureEmployeeSheetColumns(sheets);
     return;
   }
 
@@ -618,10 +696,10 @@ async function ensureEmployeeSheet(sheets) {
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A1:D1`,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A1:E1`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: [['加入時間', 'LINE userId', '顯示名稱', '狀態']],
+      values: [['加入時間', 'LINE userId', '顯示名稱', '狀態', '排序']],
     },
   });
 
@@ -654,12 +732,41 @@ async function seedEmployeeSheetFromSchedules(sheets) {
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: GOOGLE_SHEET_ID,
-    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:D`,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:E`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
-      values: names.map((name) => [formatTaipeiDateTime(new Date()), '', name, 'active']),
+      values: names.map((name, index) => [formatTaipeiDateTime(new Date()), '', name, 'active', index + 1]),
     },
   });
+}
+
+async function ensureEmployeeSheetColumns(sheets) {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A1:E1`,
+  });
+  const header = response.data.values?.[0] ?? [];
+
+  if (String(header[4] ?? '').trim() === '排序') {
+    return;
+  }
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!E1`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [['排序']],
+    },
+  });
+}
+
+function compareEmployeeRecords(first, second) {
+  return first.sortOrder - second.sortOrder || first.rowNumber - second.rowNumber;
+}
+
+function getNextSortOrder(records) {
+  return records.reduce((maxOrder, record) => Math.max(maxOrder, Number(record.sortOrder) || 0), 0) + 1;
 }
 
 async function getScheduleSheetContext(sheets) {

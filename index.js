@@ -10,6 +10,7 @@ import {
   getEmployees,
   getSchedules,
   getSignupHistory,
+  moveEmployee,
   registerEmployee,
   removeEmployeeByName,
   removeUserShift,
@@ -184,6 +185,30 @@ app.post('/api/employees/rename', express.json(), async (req, res, next) => {
     });
 
     res.json({ employee });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/employees/move', express.json(), async (req, res, next) => {
+  try {
+    const actor = await resolveLineActor({
+      idToken: req.body?.idToken,
+      devProfile: req.body?.devProfile,
+    });
+
+    if (!actor.isAdmin) {
+      res.status(403).json({ error: 'Only admins can reorder employees.' });
+      return;
+    }
+
+    res.json({
+      employee: await moveEmployee({
+        actor,
+        displayName: req.body?.displayName,
+        direction: req.body?.direction,
+      }),
+    });
   } catch (error) {
     next(error);
   }
