@@ -113,44 +113,15 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     main {
       padding: 18px 12px 28px;
     }
-    .bow-mark {
-      display: inline-grid;
+    .brand-logo {
+      background: #fff;
+      border: 2px solid #fff;
+      border-radius: 18px;
+      box-shadow: 0 10px 22px rgba(40, 82, 63, 0.16);
       flex: 0 0 auto;
-      height: 38px;
-      place-items: center;
-      position: relative;
-      width: 52px;
-    }
-    .bow-mark::before,
-    .bow-mark::after {
-      background: var(--brand);
-      border: 3px solid #fff;
-      box-shadow: 0 5px 12px rgba(180, 63, 95, 0.22);
-      content: "";
-      height: 26px;
-      position: absolute;
-      top: 5px;
-      width: 28px;
-    }
-    .bow-mark::before {
-      border-radius: 16px 12px 14px 12px;
-      left: 0;
-      transform: rotate(-16deg);
-    }
-    .bow-mark::after {
-      border-radius: 12px 16px 12px 14px;
-      right: 0;
-      transform: rotate(16deg);
-    }
-    .bow-knot {
-      background: #ffd3dc;
-      border: 3px solid #fff;
-      border-radius: 999px;
-      box-shadow: 0 5px 12px rgba(180, 63, 95, 0.18);
-      height: 22px;
-      position: relative;
-      width: 22px;
-      z-index: 1;
+      height: 58px;
+      object-fit: cover;
+      width: 58px;
     }
     .dev-login {
       display: none;
@@ -486,7 +457,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       main {
         padding: 0;
       }
-      .bow-mark,
+      .brand-logo,
       .month-nav,
       .dev-login,
       .notice,
@@ -540,7 +511,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
 <body>
   <header>
     <div class="brand">
-      <span class="bow-mark" aria-hidden="true"><span class="bow-knot"></span></span>
+      <img class="brand-logo" src="/assets/logo11.png" alt="清福全">
       <div class="brand-copy">
         <h1>清心填班系統</h1>
         <div class="user" id="user">登入中</div>

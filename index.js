@@ -23,6 +23,8 @@ const client = hasLineConfig
 
 const app = express();
 
+app.use('/assets', express.static('public'));
+
 app.get('/', (req, res) => {
   res.send('Drink shop scheduler LINE Bot is running.');
 });
