@@ -102,12 +102,6 @@ export async function registerEmployee(actor) {
         values: [[actor.userId]],
       });
     }
-    if (existing.displayName !== actor.displayName) {
-      updates.push({
-        range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!C${existing.rowNumber}`,
-        values: [[actor.displayName]],
-      });
-    }
 
     for (const update of updates) {
       await sheets.spreadsheets.values.update({
@@ -120,6 +114,7 @@ export async function registerEmployee(actor) {
 
     return {
       ...actor,
+      displayName: existing.displayName,
       isRemoved: false,
     };
   }
@@ -187,6 +182,71 @@ export async function addEmployeeByName({ actor, displayName }) {
   return { displayName: employeeName };
 }
 
+export async function renameEmployee({ actor, currentName, newName }) {
+  const employeeName = String(currentName || actor.displayName || '').trim();
+  const nextName = String(newName || '').trim();
+
+  if (!employeeName || !nextName) {
+    const error = new Error('Current name and new name are required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!actor.isAdmin && employeeName !== actor.displayName) {
+    const error = new Error('Only admins can rename other employees.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (employeeName === nextName) {
+    return { displayName: nextName };
+  }
+
+  const sheets = createSheetsClient();
+  const records = await getEmployeeRecords(sheets);
+  const matched = records.filter((record) => {
+    if (actor.isAdmin) return record.displayName === employeeName && record.status === 'active';
+    return record.status === 'active' && ((actor.userId && record.lineUserId === actor.userId) || record.displayName === employeeName);
+  });
+
+  if (matched.length === 0) {
+    const error = new Error('Employee not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const duplicate = records.find((record) => {
+    return record.status === 'active' && record.displayName === nextName && !matched.some((item) => item.rowNumber === record.rowNumber);
+  });
+
+  if (duplicate) {
+    const error = new Error('This employee name is already used.');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  for (const record of matched) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!C${record.rowNumber}`,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[nextName]],
+      },
+    });
+  }
+
+  await updateScheduleEmployeeName(sheets, employeeName, nextName);
+
+  await appendSignupHistory(sheets, {
+    actor,
+    action: actor.displayName === employeeName ? `修改名稱 ${employeeName} -> ${nextName}` : `代改名稱 ${employeeName} -> ${nextName}`,
+    schedule: {},
+  });
+
+  return { displayName: nextName };
+}
+
 export async function removeEmployeeByName({ actor, displayName }) {
   const employeeName = String(displayName || '').trim();
 
@@ -224,6 +284,42 @@ export async function removeEmployeeByName({ actor, displayName }) {
   });
 
   return { displayName: employeeName };
+}
+
+async function updateScheduleEmployeeName(sheets, currentName, nextName) {
+  const rowsResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: GOOGLE_SHEET_RANGE,
+  });
+  const rows = rowsResponse.data.values ?? [];
+  const [header, ...dataRows] = rows;
+
+  if (!header) return;
+
+  const columnMap = createColumnMap(header);
+  if (columnMap.employee < 0) return;
+
+  const sheetName = getSheetNameFromRange(GOOGLE_SHEET_RANGE);
+  const employeeColumn = toColumnLetter(columnMap.employee + 1);
+  const updates = dataRows
+    .map((row, index) => ({
+      rowNumber: index + 2,
+      value: String(row[columnMap.employee] ?? '').trim(),
+    }))
+    .filter((row) => row.value === currentName)
+    .map((row) => ({
+      range: `${quoteSheetName(sheetName)}!${employeeColumn}${row.rowNumber}`,
+      values: [[nextName]],
+    }));
+
+  for (const update of updates) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: GOOGLE_SHEET_ID,
+      range: update.range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: update.values },
+    });
+  }
 }
 
 export async function assignSchedule(rowNumber, actor) {

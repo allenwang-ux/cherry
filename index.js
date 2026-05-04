@@ -13,6 +13,7 @@ import {
   registerEmployee,
   removeEmployeeByName,
   removeUserShift,
+  renameEmployee,
   upsertUserShift,
 } from './sheets.js';
 
@@ -163,6 +164,26 @@ app.post('/api/employees/remove', express.json(), async (req, res, next) => {
     }
 
     res.json({ employee: await removeEmployeeByName({ actor, displayName: req.body?.displayName }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/employees/rename', express.json(), async (req, res, next) => {
+  try {
+    const actor = await resolveLineActor({
+      idToken: req.body?.idToken,
+      devProfile: req.body?.devProfile,
+    });
+
+    const currentName = actor.isAdmin ? String(req.body?.currentName ?? '') : actor.displayName;
+    const employee = await renameEmployee({
+      actor,
+      currentName,
+      newName: req.body?.newName,
+    });
+
+    res.json({ employee });
   } catch (error) {
     next(error);
   }

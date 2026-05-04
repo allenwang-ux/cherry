@@ -31,9 +31,9 @@ function withAdminRole(actor) {
 
 function isAdmin(actor) {
   const adminUserIds = parseList(ADMIN_LINE_USER_IDS);
-  const adminDisplayNames = parseList(ADMIN_DISPLAY_NAMES);
+  const adminDisplayNames = [...parseList(ADMIN_DISPLAY_NAMES), 'cherrywu'].map(normalizeName);
 
-  return adminUserIds.includes(actor.userId) || adminDisplayNames.includes(actor.displayName);
+  return adminUserIds.includes(actor.userId) || adminDisplayNames.includes(normalizeName(actor.displayName));
 }
 
 function parseList(value) {
@@ -41,6 +41,10 @@ function parseList(value) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase();
 }
 
 async function verifyLineIdToken(idToken) {

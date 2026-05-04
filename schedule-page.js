@@ -199,6 +199,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       margin: 0 auto 12px;
       max-width: 1180px;
     }
+    .profile-panel,
     .admin-panel {
       align-items: center;
       background: rgba(255, 255, 255, 0.88);
@@ -212,11 +213,25 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       max-width: 1180px;
       padding: 10px;
     }
+    .profile-panel {
+      display: none;
+      justify-content: space-between;
+    }
+    .profile-panel .profile-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .profile-panel strong {
+      font-size: 14px;
+    }
     .admin-panel label {
       color: var(--muted);
       font-size: 13px;
       font-weight: 800;
     }
+    .profile-panel input,
     .admin-panel select,
     .admin-panel input {
       border: 1px solid var(--line);
@@ -224,6 +239,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       font-size: 15px;
       min-height: 38px;
       padding: 8px 10px;
+    }
+    .profile-panel input {
+      min-width: 150px;
     }
     .admin-panel select {
       min-width: 150px;
@@ -520,11 +538,26 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         font-size: 11px;
         padding: 4px 7px;
       }
+      .profile-panel,
       .admin-panel {
         border-radius: 12px;
         gap: 6px;
         margin-bottom: 6px;
         padding: 7px;
+      }
+      .profile-panel {
+        align-items: stretch;
+        flex-direction: column;
+      }
+      .profile-panel .profile-actions {
+        width: 100%;
+      }
+      .profile-panel input,
+      .profile-panel .secondary {
+        flex: 1 1 118px;
+        font-size: 12px;
+        min-height: 32px;
+        padding: 6px 8px;
       }
       .admin-panel label {
         width: 100%;
@@ -627,6 +660,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       .dev-login,
       .login-panel,
       .notice,
+      .profile-panel,
       .admin-panel,
       .legend,
       .history-panel {
@@ -702,9 +736,18 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       <button type="button" id="devLoginButton">使用測試身份</button>
     </div>
     <div class="notice" id="notice">讀取班表中</div>
+    <div class="profile-panel" id="profilePanel">
+      <strong>我的名稱</strong>
+      <div class="profile-actions">
+        <input id="myDisplayName" placeholder="我的顯示名稱" aria-label="我的顯示名稱">
+        <button class="secondary" type="button" id="renameSelf">儲存名稱</button>
+      </div>
+    </div>
     <div class="admin-panel" id="adminPanel">
       <label for="targetEmployee">管理排班</label>
       <select id="targetEmployee"></select>
+      <input id="renameEmployeeName" placeholder="改成新姓名" aria-label="改成新姓名">
+      <button class="secondary" type="button" id="renameEmployee">修改名稱</button>
       <input id="newEmployeeName" placeholder="新增員工姓名" aria-label="新增員工姓名">
       <button class="secondary" type="button" id="addEmployee">加入欄位</button>
       <button class="secondary" type="button" id="removeEmployee">移除員工</button>
@@ -787,12 +830,15 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     const loginCopy = document.querySelector('#loginCopy');
     const devLogin = document.querySelector('#devLogin');
     const devName = document.querySelector('#devName');
+    const profilePanel = document.querySelector('#profilePanel');
+    const myDisplayName = document.querySelector('#myDisplayName');
     const monthTitle = document.querySelector('#monthTitle');
     const dialog = document.querySelector('#shiftDialog');
     const modalDate = document.querySelector('#modalDate');
     const shiftPicker = document.querySelector('#shiftPicker');
     const adminPanel = document.querySelector('#adminPanel');
     const targetEmployee = document.querySelector('#targetEmployee');
+    const renameEmployeeName = document.querySelector('#renameEmployeeName');
     const newEmployeeName = document.querySelector('#newEmployeeName');
     const historyPanel = document.querySelector('#historyPanel');
     const historyList = document.querySelector('#historyList');
@@ -810,6 +856,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     document.querySelector('#refreshHistory').addEventListener('click', loadHistory);
     document.querySelector('#printSchedule').addEventListener('click', () => window.print());
     document.querySelector('#lineLoginButton').addEventListener('click', () => startLineLogin(true));
+    document.querySelector('#renameSelf').addEventListener('click', renameSelf);
+    document.querySelector('#renameEmployee').addEventListener('click', renameSelectedEmployee);
     document.querySelector('#devLoginButton').addEventListener('click', async () => {
       profile = {
         userId: 'dev-user',
@@ -819,6 +867,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       devLogin.style.display = 'none';
       const sessionOk = await loadSession();
       if (!sessionOk) return;
+      renderProfilePanel();
       await loadSchedules();
       startLiveRefresh();
     });
@@ -938,10 +987,24 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         return false;
       }
       if (actor?.isAdmin) {
-        user.textContent = profile.displayName + ' 管理者';
+        user.textContent = actor.displayName + ' 管理者';
         await loadHistory();
+      } else {
+        user.textContent = actor.displayName;
       }
+      profile.displayName = actor.displayName;
+      renderProfilePanel();
       return true;
+    }
+
+    function renderProfilePanel() {
+      if (!actor || actor.isRemoved) {
+        profilePanel.style.display = 'none';
+        return;
+      }
+
+      profilePanel.style.display = 'flex';
+      myDisplayName.value = actor.displayName || profile?.displayName || '';
     }
 
     function render() {
@@ -1015,6 +1078,58 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       if (current && staffNames.includes(current)) {
         targetEmployee.value = current;
       }
+    }
+
+    async function renameSelf() {
+      const newName = myDisplayName.value.trim();
+      if (!newName || !actor) return;
+
+      await renameEmployeeRequest({
+        currentName: actor.displayName,
+        newName,
+        self: true,
+      });
+    }
+
+    async function renameSelectedEmployee() {
+      const currentName = targetEmployee.value;
+      const newName = renameEmployeeName.value.trim();
+      if (!currentName || !newName) return;
+
+      await renameEmployeeRequest({
+        currentName,
+        newName,
+        self: currentName === actor?.displayName,
+      });
+      renameEmployeeName.value = '';
+    }
+
+    async function renameEmployeeRequest({ currentName, newName, self }) {
+      const response = await fetch('/api/employees/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentName,
+          newName,
+          idToken,
+          devProfile: profile,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        showError(data.error || '修改名稱失敗');
+        return;
+      }
+
+      if (self) {
+        actor.displayName = data.employee.displayName;
+        profile.displayName = data.employee.displayName;
+        user.textContent = actor.isAdmin ? actor.displayName + ' 管理者' : actor.displayName;
+        renderProfilePanel();
+      }
+      await loadSchedules();
+      await loadHistory();
     }
 
     function openShiftDialog(dateText, employeeName) {
