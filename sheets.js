@@ -528,6 +528,8 @@ async function ensureEmployeeSheet(sheets) {
       values: [['加入時間', 'LINE userId', '顯示名稱', '狀態']],
     },
   });
+
+  await seedEmployeeSheetFromSchedules(sheets);
 }
 
 async function sheetExists(sheets, sheetName) {
@@ -536,6 +538,32 @@ async function sheetExists(sheets, sheetName) {
   });
 
   return spreadsheet.data.sheets.some((sheet) => sheet.properties.title === sheetName);
+}
+
+async function seedEmployeeSheetFromSchedules(sheets) {
+  const rowsResponse = await sheets.spreadsheets.values.get({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: GOOGLE_SHEET_RANGE,
+  });
+  const rows = rowsResponse.data.values ?? [];
+  const [header, ...dataRows] = rows;
+
+  if (!header) return;
+
+  const columnMap = createColumnMap(header);
+  if (columnMap.employee < 0) return;
+
+  const names = [...new Set(dataRows.map((row) => String(row[columnMap.employee] ?? '').trim()).filter(Boolean))];
+  if (names.length === 0) return;
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: GOOGLE_SHEET_ID,
+    range: `${quoteSheetName(EMPLOYEE_SHEET_NAME)}!A:D`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: names.map((name) => [formatTaipeiDateTime(new Date()), '', name, 'active']),
+    },
+  });
 }
 
 async function getScheduleSheetContext(sheets) {

@@ -202,6 +202,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     .admin-panel input {
       min-width: 140px;
     }
+    .admin-panel .secondary {
+      min-height: 38px;
+    }
     .admin-tools {
       display: flex;
       flex-wrap: wrap;
@@ -276,6 +279,12 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       min-width: 720px;
       table-layout: fixed;
       width: 100%;
+    }
+    .staff-head {
+      overflow: hidden;
+      padding: 0 3px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     th,
     td {
@@ -422,24 +431,132 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     }
     @media (max-width: 720px) {
       header {
-        align-items: flex-start;
-        flex-direction: column;
-        padding: 12px;
+        align-items: center;
+        flex-direction: row;
+        gap: 8px;
+        padding: 8px;
+      }
+      .brand {
+        gap: 8px;
+      }
+      .brand-logo {
+        border-radius: 12px;
+        height: 40px;
+        width: 40px;
+      }
+      h1 {
+        font-size: 15px;
+      }
+      .user {
+        font-size: 11px;
+      }
+      .icon-button {
+        height: 32px;
+        width: 32px;
+      }
+      .month-title {
+        font-size: 14px;
+        min-width: 72px;
       }
       .month-nav {
-        width: 100%;
+        flex: 0 0 auto;
         justify-content: space-between;
       }
       main {
-        padding: 10px;
+        padding: 8px 4px 18px;
+      }
+      .notice {
+        border-radius: 12px;
+        font-size: 12px;
+        margin-bottom: 6px;
+        padding: 8px 10px;
+      }
+      .legend {
+        gap: 4px;
+        margin-bottom: 6px;
+        padding: 0 2px;
+      }
+      .legend span {
+        font-size: 11px;
+        padding: 4px 7px;
+      }
+      .admin-panel {
+        border-radius: 12px;
+        gap: 6px;
+        margin-bottom: 6px;
+        padding: 7px;
+      }
+      .admin-panel label {
+        width: 100%;
+      }
+      .admin-panel select,
+      .admin-panel input,
+      .admin-panel .secondary {
+        font-size: 12px;
+        min-height: 32px;
+        padding: 6px 8px;
+      }
+      .admin-panel select {
+        flex: 1 1 118px;
+        min-width: 0;
+      }
+      .admin-panel input {
+        flex: 1 1 118px;
+        min-width: 0;
       }
       .date-head,
       .date-cell {
-        width: 68px;
+        width: 43px;
+      }
+      .table-wrap {
+        border-radius: 12px;
+        overflow-x: hidden;
+      }
+      table {
+        min-width: 0;
+        width: 100%;
       }
       th,
       td {
-        height: 40px;
+        font-size: 10px;
+        height: 34px;
+      }
+      th:not(.date-head),
+      td:not(.date-cell) {
+        width: calc((100vw - 51px) / var(--staff-count, 10));
+      }
+      th {
+        font-size: 10px;
+        height: 58px;
+      }
+      .staff-head {
+        align-items: center;
+        display: inline-flex;
+        height: 52px;
+        justify-content: center;
+        line-height: 1;
+        max-width: 18px;
+        overflow: hidden;
+        text-overflow: clip;
+        white-space: normal;
+        writing-mode: vertical-rl;
+      }
+      .date-cell {
+        font-size: 12px;
+      }
+      .weekday {
+        font-size: 10px;
+        margin-left: 1px;
+      }
+      .holiday-name {
+        font-size: 8px;
+      }
+      .shift-code {
+        border: 0;
+        box-shadow: none;
+        font-size: 12px;
+        min-width: 0;
+        padding: 3px 4px;
       }
       .admin-tools {
         margin-left: 0;
@@ -447,6 +564,14 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       }
       .history-item {
         grid-template-columns: 1fr;
+        padding: 7px 9px;
+      }
+      .history-panel {
+        border-radius: 12px;
+        margin-bottom: 6px;
+      }
+      .history-list {
+        max-height: 120px;
       }
     }
     @media print {
@@ -603,6 +728,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     let editingDate = '';
     let editingEmployee = '';
     let selectedShifts = new Set();
+    let refreshTimer = null;
+    let isLoadingSchedules = false;
 
     const tableHead = document.querySelector('#tableHead');
     const tableBody = document.querySelector('#tableBody');
@@ -642,6 +769,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       const sessionOk = await loadSession();
       if (!sessionOk) return;
       await loadSchedules();
+      startLiveRefresh();
     });
 
     boot();
@@ -660,6 +788,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
           const sessionOk = await loadSession();
           if (!sessionOk) return;
           await loadSchedules();
+          startLiveRefresh();
           return;
         }
 
@@ -672,16 +801,31 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       }
     }
 
-    async function loadSchedules() {
-      notice.className = 'notice';
-      notice.textContent = '讀取班表中';
-      notice.style.display = 'block';
-      const response = await fetch('/api/schedules');
-      const data = await response.json();
-      schedules = data.schedules || [];
-      employees = data.employees || [];
-      notice.style.display = 'none';
-      render();
+    async function loadSchedules(options = {}) {
+      if (isLoadingSchedules) return;
+      isLoadingSchedules = true;
+      const silent = options.silent === true;
+      try {
+        if (!silent) {
+          notice.className = 'notice';
+          notice.textContent = '讀取班表中';
+          notice.style.display = 'block';
+        }
+        const response = await fetch('/api/schedules');
+        const data = await response.json();
+        if (!response.ok) {
+          showError(data.error || '讀取班表失敗');
+          return;
+        }
+        schedules = data.schedules || [];
+        employees = data.employees || [];
+        if (!silent) {
+          notice.style.display = 'none';
+        }
+        render();
+      } finally {
+        isLoadingSchedules = false;
+      }
     }
 
     async function loadSession() {
@@ -715,9 +859,10 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       const staffNames = getStaffNames();
       const today = formatDate(new Date());
       monthTitle.textContent = formatMonthTitle(activeMonth);
+      document.documentElement.style.setProperty('--staff-count', String(Math.max(staffNames.length, 1)));
 
       tableHead.innerHTML = '<tr><th class="date-head">日期</th>' + staffNames
-        .map((name) => \`<th>\${escapeHtml(name)}</th>\`)
+        .map((name) => \`<th><span class="staff-head">\${escapeHtml(name)}</span></th>\`)
         .join('') + '</tr>';
 
       renderAdminPanel(staffNames);
@@ -843,9 +988,25 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         schedules.push(data.schedule);
       }
       dialog.close();
+      await loadSchedules({ silent: true });
       await loadHistory();
-      render();
     }
+
+    function startLiveRefresh() {
+      if (refreshTimer) window.clearInterval(refreshTimer);
+      refreshTimer = window.setInterval(async () => {
+        if (document.hidden || dialog.open || !profile || actor?.isRemoved) return;
+        await loadSchedules({ silent: true });
+        if (actor?.isAdmin) await loadHistory();
+      }, 5000);
+    }
+
+    document.addEventListener('visibilitychange', async () => {
+      if (!document.hidden && profile && !actor?.isRemoved) {
+        await loadSchedules({ silent: true });
+        if (actor?.isAdmin) await loadHistory();
+      }
+    });
 
     async function loadHistory() {
       if (!actor?.isAdmin) return;
