@@ -409,6 +409,12 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       table-layout: fixed;
       width: 100%;
     }
+    .date-col {
+      width: 82px;
+    }
+    .staff-col {
+      width: auto;
+    }
     .staff-head {
       overflow: hidden;
       padding: 0 3px;
@@ -571,14 +577,22 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       box-shadow: 0 6px 14px rgba(232, 63, 103, 0.12);
     }
     @media (max-width: 720px) {
+      body {
+        overflow-x: hidden;
+      }
       header {
         align-items: center;
+        box-sizing: border-box;
         flex-direction: row;
         gap: 8px;
-        padding: 8px;
+        left: 0;
+        max-width: 100vw;
+        padding: 8px 132px 8px 8px;
+        width: 100vw;
       }
       .brand {
         gap: 8px;
+        max-width: 100%;
       }
       .brand-logo {
         border-radius: 12px;
@@ -604,18 +618,44 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         padding: 2px 6px;
       }
       .icon-button {
-        height: 32px;
-        width: 32px;
+        height: 30px;
+        width: 30px;
       }
       .month-title {
-        font-size: 14px;
-        min-width: 72px;
+        font-size: 12px;
+        min-width: 48px;
       }
       .month-nav {
-        flex: 0 0 auto;
+        box-sizing: border-box;
         justify-content: space-between;
+        gap: 3px;
+        left: 264px;
+        padding: 4px;
+        position: fixed;
+        right: auto;
+        top: 8px;
+        width: 120px;
+        z-index: 30;
+      }
+      .month-nav .icon-button {
+        height: 26px;
+        width: 26px;
+      }
+      @media (max-width: 380px) {
+        header {
+          padding-right: 122px;
+        }
+        .month-nav {
+          left: 236px;
+          width: 116px;
+        }
+        .month-title {
+          min-width: 44px;
+        }
       }
       main {
+        max-width: 100vw;
+        overflow-x: hidden;
         padding: 8px 4px 18px;
       }
       .notice {
@@ -658,6 +698,10 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       .profile-panel .profile-actions {
         width: 100%;
       }
+      .profile-panel *,
+      .admin-panel * {
+        min-width: 0;
+      }
       .profile-panel input,
       .profile-panel .secondary {
         flex: 1 1 118px;
@@ -671,6 +715,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       .admin-panel select,
       .admin-panel input,
       .admin-panel .secondary {
+        flex: 1 1 82px;
         font-size: 12px;
         min-height: 32px;
         padding: 6px 8px;
@@ -683,17 +728,40 @@ export function renderSchedulePage({ liffId = '' } = {}) {
         flex: 1 1 118px;
         min-width: 0;
       }
+      .admin-tools {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        margin-left: 0;
+        width: 100%;
+      }
+      .admin-tools .secondary {
+        width: 100%;
+      }
       .date-head,
       .date-cell {
-        width: 43px;
+        width: 39px;
       }
       .table-wrap {
         border-radius: 12px;
+        max-width: calc(100vw - 8px);
         overflow-x: hidden;
+        width: calc(100vw - 8px);
       }
       table {
+        max-width: calc(100vw - 8px);
         min-width: 0;
-        width: 100%;
+        width: calc(100vw - 8px);
+      }
+      table.many-staff {
+        transform: scaleX(0.78);
+        transform-origin: left top;
+        width: 128vw;
+      }
+      .date-col {
+        width: 39px;
+      }
+      .staff-col {
+        width: calc((100vw - 47px) / var(--staff-count, 10));
       }
       th,
       td {
@@ -702,26 +770,28 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       }
       th:not(.date-head),
       td:not(.date-cell) {
-        width: calc((100vw - 51px) / var(--staff-count, 10));
+        max-width: calc((100vw - 47px) / var(--staff-count, 10));
+        min-width: 0;
+        width: calc((100vw - 47px) / var(--staff-count, 10));
       }
       th {
-        font-size: 10px;
-        height: 58px;
+        font-size: 9px;
+        height: 54px;
       }
       .staff-head {
         align-items: center;
         display: inline-flex;
-        height: 52px;
+        height: 49px;
         justify-content: center;
         line-height: 1;
-        max-width: 18px;
+        max-width: 14px;
         overflow: hidden;
         text-overflow: clip;
         white-space: normal;
         writing-mode: vertical-rl;
       }
       .date-cell {
-        font-size: 12px;
+        font-size: 11px;
       }
       .weekday {
         font-size: 10px;
@@ -733,9 +803,9 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       .shift-code {
         border: 0;
         box-shadow: none;
-        font-size: 12px;
+        font-size: 11px;
         min-width: 0;
-        padding: 3px 4px;
+        padding: 2px 3px;
       }
       .admin-tools {
         margin-left: 0;
@@ -878,6 +948,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     </div>
     <div class="table-wrap">
       <table aria-label="月份班表">
+        <colgroup id="tableCols"></colgroup>
         <thead id="tableHead"></thead>
         <tbody id="tableBody"></tbody>
       </table>
@@ -931,6 +1002,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     let isLoadingSchedules = false;
 
     const tableHead = document.querySelector('#tableHead');
+    const scheduleTable = document.querySelector('table');
+    const tableCols = document.querySelector('#tableCols');
     const tableBody = document.querySelector('#tableBody');
     const notice = document.querySelector('#notice');
     const user = document.querySelector('#user');
@@ -1124,6 +1197,8 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       const today = formatDate(new Date());
       monthTitle.textContent = formatMonthTitle(activeMonth);
       document.documentElement.style.setProperty('--staff-count', String(Math.max(staffNames.length, 1)));
+      scheduleTable.classList.toggle('many-staff', staffNames.length >= 8);
+      tableCols.innerHTML = '<col class="date-col">' + staffNames.map(() => '<col class="staff-col">').join('');
 
       tableHead.innerHTML = '<tr><th class="date-head">日期</th>' + staffNames
         .map((name) => \`<th><span class="staff-head">\${escapeHtml(name)}</span></th>\`)
