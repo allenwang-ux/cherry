@@ -1028,7 +1028,7 @@ export function renderSchedulePage({ liffId = '' } = {}) {
     document.querySelector('#prevMonth').addEventListener('click', () => changeMonth(-1));
     document.querySelector('#nextMonth').addEventListener('click', () => changeMonth(1));
     document.querySelector('#cancelShift').addEventListener('click', () => dialog.close());
-    document.querySelector('#clearShift').addEventListener('click', () => saveShift(''));
+    document.querySelector('#clearShift').addEventListener('click', () => saveShift('', { closeDialog: true }));
     document.querySelector('#addEmployee').addEventListener('click', addEmployee);
     document.querySelector('#removeEmployee').addEventListener('click', removeEmployee);
     document.querySelector('#refreshHistory').addEventListener('click', loadHistory);
@@ -1371,20 +1371,32 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       document.querySelectorAll('.shift-option').forEach((button) => {
         button.addEventListener('click', async () => {
           const shift = button.dataset.shift;
-          selectedShifts = new Set([shift]);
+          if (shift === 'X') {
+            selectedShifts = selectedShifts.has('X') ? new Set() : new Set(['X']);
+          } else {
+            const nextShifts = new Set(selectedShifts);
+            nextShifts.delete('X');
+            if (nextShifts.has(shift)) {
+              nextShifts.delete(shift);
+            } else {
+              nextShifts.add(shift);
+            }
+            selectedShifts = nextShifts;
+          }
           renderShiftPicker();
-          await saveShift(shift);
+          await saveShift();
         });
       });
     }
 
-    async function saveShift(shiftOverride) {
+    async function saveShift(shiftOverride, options = {}) {
       if (!profile) {
         showError('請先登入 LINE。');
         return;
       }
 
       const shift = shiftOverride === undefined ? SHIFT_CODES.filter((code) => selectedShifts.has(code)).join('+') : shiftOverride;
+      const closeDialog = options.closeDialog === true;
 
       const response = await fetch('/api/my-shifts', {
         method: 'POST',
@@ -1410,9 +1422,15 @@ export function renderSchedulePage({ liffId = '' } = {}) {
       if (shift) {
         schedules.push(data.schedule);
       }
-      dialog.close();
-      await loadSchedules({ silent: true });
+      render();
+      if (dialog.open && !closeDialog) {
+        renderShiftPicker();
+      }
+      if (closeDialog) {
+        dialog.close();
+      }
       await loadHistory();
+      loadSchedules({ silent: true });
     }
 
     function startLiveRefresh() {
